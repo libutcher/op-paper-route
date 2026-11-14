@@ -2,59 +2,68 @@
 
 A small macOS utility for getting a document you just downloaded into a 1Password vault with as little friction as possible: one Touch ID, drop the file, done.
 
-Built on the official [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js) with desktop-app authentication, so there are no tokens or service accounts: the 1Password app itself approves each session, and the app can reach every vault you can, including your Private vault.
+Built on the official [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js) with desktop-app authentication, so there are no tokens or service accounts: the 1Password app itself approves each session, and PaperRoute can reach every vault you can, including your Private vault.
 
 ![PaperRoute connecting to 1Password, receiving a file from Finder, and saving it to a vault, in dark mode](docs/demo-dark.gif)
 
 *A scripted run of the real window against a stand-in backend (`npm run demo`), so nothing personal appears.*
 
-## Status
+## What's included
 
-Usable, and packaged as a Mac app. It isn't signed with an Apple Developer ID yet, so on a Mac other than the one it was built on, macOS asks you to allow it once (see [Installing](#installing)).
+- **A menu-bar app.** A paper-plane icon in the menu bar, no Dock icon. Press **Control-Option-P** to open a small window: drop a document, check the title and vault, press Return. The last vault you used is already selected.
+- **A Finder Quick Action.** Right-click a file → **Quick Actions → Save to 1Password with PaperRoute**, and the window opens with that file loaded. Installed from the app's own menu.
+- **Other ways in:** drop a file on the menu-bar icon, or choose one with a file picker.
+- **Optional clean-up.** A checkbox moves the original to the Trash once the document is safely in 1Password.
+- **A command-line interface**, for scripts and Shortcuts.
 
-| Milestone | State |
-|---|---|
-| M0 Prove an upload works end to end | Done |
-| M1 Core library with tests, and a CLI | Done |
-| M2 Desktop app: menu bar, hotkey, drop zone, vault picker | Done |
-| M3 Getting files in: Finder Quick Action, drop on the menu-bar icon, optional move to Trash | Done |
-| M4a Packaged app: disk image, app icon, hardened runtime, locked-down Electron | Done |
-| M4b Developer ID signing and notarisation | Needs an Apple Developer membership |
+What PaperRoute never does: it stores no tokens or passwords, uses no service accounts, and never reads 1Password's own files. Every session is approved by you, in the 1Password app, the same way you unlock it.
 
-## Installing
+## Requirements
 
-Requirements: macOS on Apple silicon or Intel, and the 1Password desktop app with **Settings → Developer → Integrate with 1Password SDKs** turned on.
+- **macOS** on Apple silicon (an Intel build can be made from source).
+- **The 1Password desktop app**, with **Settings → Developer → Integrate with 1Password SDKs** turned on. PaperRoute talks to 1Password only through this.
+- **Node 20 or later**, only if you build from source or use the command-line interface.
+
+## Installation
 
 1. Open `PaperRoute-<version>-<arch>.dmg` and drag **PaperRoute** to **Applications**.
-2. Open it from Applications. Because the app isn't signed with a Developer ID yet, macOS may refuse the first time: go to **System Settings → Privacy & Security**, find the message about PaperRoute, and choose **Open Anyway**. You only do this once.
-3. To add the Finder Quick Action, click the paper-plane icon in the menu bar and choose **Install Finder Quick Action…**.
+2. Open it from Applications. PaperRoute isn't signed with an Apple Developer ID yet, so macOS may refuse the first time: go to **System Settings → Privacy & Security**, find the message about PaperRoute, and choose **Open Anyway**. You only do this once.
+3. Click the paper-plane icon in the menu bar and choose **Install Finder Quick Action…**. The same menu item removes it again.
 
-To build the disk image yourself: `npm install`, then `npm run dmg` (it lands in `out/`).
+To build the disk image yourself: `npm install`, then `npm run dmg`. It lands in `out/`.
 
-## Using the app
+## Using PaperRoute
 
-PaperRoute lives in the menu bar as a small paper-plane icon, with no Dock icon. Press **Control-Option-P** (or click the icon) to open its window:
+### The first time
 
-1. The first time, enter your 1Password account name: open 1Password and copy the name at the very top of the sidebar, above your vaults. PaperRoute checks it with 1Password straight away and tells you if it doesn't match. It's forgiving about capitals and apostrophe style, but otherwise the name must match exactly; there's no way for an app to list your 1Password accounts for you.
-2. Approve the request in 1Password. Approval lasts until 1Password locks or ten minutes pass without use.
-3. Give it a document: drop it on the window, drop it on the menu-bar icon, choose one, or use the Finder Quick Action below. The title fills in from the file name and the last vault you used is already selected.
-4. Press **Return**. **Esc** hides the window.
+PaperRoute asks which 1Password account your documents should go to. Open 1Password and copy the name at the very top of the sidebar, above your vaults, then enter it and press Continue. PaperRoute checks the name with 1Password straight away and tells you if it doesn't match. It's forgiving about capitals and apostrophe style, but otherwise the name must match exactly: there's no way for an app to list your 1Password accounts for you.
 
-If a document with the same title is already in the vault, PaperRoute asks before saving another. If you hand it a file while a save is in progress, that file waits and loads when the save finishes. Saved documents are tagged `paper-route`.
+Approve the request in 1Password. Approval lasts until 1Password locks or ten minutes pass without use; after that, PaperRoute simply asks again next time.
 
-**Move the original to the Trash after saving** (a checkbox, off by default) cleans up as you go. The file is moved only after the document has been read back from 1Password and matched, and only if it hasn't changed since it was read; it goes to the Trash rather than being deleted, so it can be recovered.
+### Saving a document
 
-Settings (the account name, last vault and Trash option) are kept in `~/Library/Application Support/paper-route/settings.json`; nothing secret is stored there.
+1. Give PaperRoute a document: right-click it in Finder and choose **Quick Actions → Save to 1Password with PaperRoute**, drop it on the window or the menu-bar icon, or press **Control-Option-P** and choose a file.
+2. The title fills in from the file name, with the name part selected so you can retype it. The vault you used last time is already chosen.
+3. Press **Return**. **Esc** hides the window.
 
-### Finder Quick Action
+If a document with the same title is already in the vault, PaperRoute asks before saving another. If you hand it a file while a save is in progress, that file waits and loads when the save finishes. With several files selected, the first is used and PaperRoute says how many were left out. Saved documents are tagged `paper-route`.
 
-Install it from the menu-bar icon: **Install Finder Quick Action…** (the same item removes it again). It adds **Save to 1Password with PaperRoute** to Finder: right-click a file → **Quick Actions**. PaperRoute opens with the file loaded; press Return to save. If PaperRoute is already running, the file goes to that copy, so there's no second approval. With several files selected, the first is used. The Quick Action finds PaperRoute by its bundle identifier, so it keeps working wherever the app is installed.
+### Moving the original to the Trash
 
-**A new Quick Action may start switched off.** If it isn't in the Quick Actions menu, turn it on in **System Settings → General → Login Items & Extensions → Extensions → Finder** (click the ⓘ). It's also available under **Services** at the bottom of the right-click menu.
+Tick **Move the original to the Trash after saving** to clean up as you go. The file is moved only after the document has been read back from 1Password and matched byte for byte, and only if it hasn't changed since it was read. It goes to the Trash, not deleted, so it can be recovered. The setting is remembered.
 
-## Using the CLI
+### If something doesn't work
 
-Runs from source: Node 20 or later, `npm install`, and the same 1Password setting as the app.
+- **The Quick Action isn't in the right-click menu.** New Quick Actions can start switched off. Turn it on in **System Settings → General → Login Items & Extensions → Extensions → Finder** (click the ⓘ). It's also available under **Services** at the bottom of the right-click menu.
+- **"Waiting for 1Password"** means 1Password is showing you an approval prompt, or is locked. Unlock it or approve the request, and PaperRoute carries on.
+- **"PaperRoute can't find the 1Password account … any more."** The account was renamed or signed out of 1Password. Check its name at the top of the 1Password sidebar and enter it again.
+- **Large files.** The 1Password SDK can't accept files over about 14 MB. PaperRoute says so before asking for approval.
+
+Settings (the account name, the last vault and the Trash option) are kept in `~/Library/Application Support/paper-route/settings.json`. Nothing secret is stored there.
+
+### The command-line interface
+
+For scripts and Shortcuts. It runs from source, so it needs Node 20 or later and `npm install`.
 
 ```sh
 export PAPER_ROUTE_ACCOUNT="<account name as shown in the 1Password sidebar>"
@@ -64,9 +73,7 @@ npm run save -- ~/Downloads/receipt.pdf --vault "Personal Docs"
 npm run save -- scan.pdf --vault <vault-id> --title "Dentist, March" --tag receipts
 ```
 
-The first call prompts for approval in the 1Password app. Approval lasts ten minutes of inactivity, per process.
-
-If two vaults share a name, `--vault` must be the id. A second document with the same title in the same vault is refused unless you pass `--allow-duplicate`.
+The first call prompts for approval in the 1Password app. If two vaults share a name, `--vault` must be the id. A second document with the same title in the same vault is refused unless you pass `--allow-duplicate`.
 
 ## Development
 
@@ -80,6 +87,7 @@ npm run typecheck
 npm run build          # compile to dist/ (npm start does this too)
 npm run package        # build out/PaperRoute-darwin-<arch>/PaperRoute.app
 npm run dmg            # package, then build out/PaperRoute-<version>-<arch>.dmg
+npm run demo           # re-record docs/demo-dark.gif from the built window
 npm run render-icons   # re-render the menu-bar and app icons from assets/*.svg
 npm run install-quick-action     # Quick Action for this source copy (the packaged app installs its own)
 PAPER_ROUTE_USER_DATA=/tmp/pr-test npm start   # run with separate settings, e.g. to see the first-run screen
@@ -88,9 +96,19 @@ PAPER_ROUTE_LIVE=1 npm test   # also runs the live test against the real app (on
 
 The live test creates one small document in the vault named by `PAPER_ROUTE_TEST_VAULT` (default `PaperRouteTest`) and deletes it again.
 
-If Electron starts and immediately exits with an error about `app` being undefined, `ELECTRON_RUN_AS_NODE` is set in your shell (VS Code's terminal sets it). `npm start` clears it; to run Electron by hand, use `env -u ELECTRON_RUN_AS_NODE npx electron .`. The packaged app ignores it (see below).
+If Electron starts and immediately exits with an error about `app` being undefined, `ELECTRON_RUN_AS_NODE` is set in your shell (VS Code's terminal sets it). `npm start` clears it; to run Electron by hand, use `env -u ELECTRON_RUN_AS_NODE npx electron .`. The packaged app ignores the variable (see Packaging).
 
-### Packaging
+### Layout
+
+- `src/core/` — everything that talks to 1Password, with no UI dependencies. `Session` owns the one long-lived SDK client; `saveDocument` reads a file, checks it fits, creates the item, reads it back and verifies the bytes; `listVaults` and `findVault`; `PaperRouteError` with a `code` the UI can switch on.
+- `src/app/` — the Electron main process. `main.ts` sets up the menu-bar icon, shortcut and window; `handlers.ts` implements each request from the window; `account-names.ts` decides which spellings of an account name to try; `handoff.ts` takes files from Finder, the menu-bar icon and other launches; `quick-action.ts` builds the Finder Quick Action's workflow; `preload.cts` is the only bridge into the sandboxed window. Everything but `main.ts` and the preload is free of Electron imports, so it can be tested.
+- `src/renderer/` — the window: a sandboxed page with no Node access.
+- `src/shared/` — types, the window ↔ main-process API, and `window-logic.ts`: the window's decisions (when to offer Try Again, when a 1Password prompt is likely, how titles are filled in), kept out of the DOM code so they can be tested.
+- `src/cli.ts` — the command-line interface, built on the core.
+- `scripts/` — packaging (`package.mjs`, `make-dmg.mjs`), icon rendering, the development Quick Action installer, and the demo recorder (`demo/`).
+- `assets/`, `build/`, `docs/` — icon sources and outputs, the entitlements, and the demo.
+
+### Packaging and signing
 
 `npm run package` signs the app **ad hoc** with the hardened runtime, using `build/entitlements.plist`:
 
@@ -101,26 +119,28 @@ It also flips Electron's **fuses** before signing, so the shipped app can't be m
 
 **Test the packaged app the way users launch it:** from Finder, or with `open`. Started from a terminal inside VS Code, macOS treats VS Code as responsible for it, so 1Password's approval prompt names VS Code instead of PaperRoute.
 
-Signing with a Developer ID and notarising (M4b) needs an Apple Developer membership; only the signing identity in `scripts/package.mjs` changes, plus a notarisation step.
+Signing with a Developer ID and notarising needs an Apple Developer membership. When that's in place, only the signing identity in `scripts/package.mjs` changes, plus a notarisation step; the entitlements and fuses stay as they are.
 
-### Layout
-
-- `src/core/` — everything that talks to 1Password, with no UI dependencies. `Session` owns the one long-lived SDK client; `saveDocument` reads a file, checks it fits, creates the item, reads it back and verifies the bytes; `listVaults` and `findVault`; `PaperRouteError` with a `code` the UI can switch on.
-- `src/app/` — the Electron main process. `main.ts` sets up the menu-bar icon, shortcut and window; `handlers.ts` implements each request from the window; `account-names.ts` decides which spellings of an account name to try; `handoff.ts` takes files from Finder, the menu-bar icon and other launches; `preload.cts` is the only bridge into the sandboxed window. Everything but `main.ts` and the preload is free of Electron imports, so it can be tested.
-- `src/renderer/` — the window: a sandboxed page with no Node access.
-- `src/shared/` — types, the window ↔ main-process API, and `window-logic.ts`: the window's decisions (when to offer Try Again, when a 1Password prompt is likely, how titles are filled in), kept out of the DOM code so they can be tested.
-- `src/cli.ts` — the command-line interface, built on the core.
-- `src/app/quick-action.ts` — builds the Finder Quick Action's workflow; used by the app's menu and by `scripts/quick-action.mjs`.
-- `scripts/` — packaging (`package.mjs`, `make-dmg.mjs`), icon rendering, and the development Quick Action installer.
-- `assets/` and `build/` — icon sources and outputs, and the entitlements.
-
-## Things worth knowing about the SDK
+### Things worth knowing about the SDK
 
 Found while building this; none of it is in the SDK documentation.
 
 - **The real file limit is about 14 MB, not 50 MB.** The SDK caps each message at 50 MB, but it serializes file bytes as a JSON array of decimal numbers, so each byte of file costs 2–4 bytes of message. `src/core/limits.ts` computes the exact encoded size before asking for approval.
-- **Authorization is per process.** Each new process gets its own approval prompt, which is why the app must keep a single long-lived client rather than spawning one per save.
-- **Locking 1Password doesn't raise the SDK's session-expired error.** The next call waits while 1Password prompts again (minutes, if nobody answers), then fails with a plain `invalid client id`. A denied prompt, and a locked app whose unlock is cancelled, both give `Denied authorization for SDK client`. `src/core/errors.ts` maps these exact messages; the UI should show that it's waiting for 1Password.
+- **Authorization is per process.** Each new process gets its own approval prompt, which is why the app keeps a single long-lived client rather than spawning one per save.
+- **Locking 1Password doesn't raise the SDK's session-expired error.** The next call waits while 1Password prompts again (minutes, if nobody answers), then fails with a plain `invalid client id`. A denied prompt, and a locked app whose unlock is cancelled, both give `Denied authorization for SDK client`. `src/core/errors.ts` maps these exact messages; the UI shows that it's waiting for 1Password.
+- **The SDK accepts only the exact account name or the account ID**, case-sensitive, not an email. There's no call that lists accounts.
 - **Vault titles are not unique.** Always select and remember vaults by id.
 - **Empty files read back as a plain `[]`**, not a `Uint8Array`; the SDK's JSON reviver only converts non-empty byte arrays.
 - Desktop auth works by `dlopen`-ing `libop_sdk_ipc_client.dylib` from inside the 1Password app bundle, so the SDK needs a real Node process; it cannot run in a browser or a plain WebView.
+
+### Project history
+
+| Milestone | State |
+|---|---|
+| M0 Prove an upload works end to end | Done |
+| M1 Core library with tests, and a CLI | Done |
+| M2 Desktop app: menu bar, hotkey, drop zone, vault picker | Done |
+| M3 Getting files in: Finder Quick Action, drop on the menu-bar icon, optional move to Trash | Done |
+| Design pass: logo, menu-bar icon, animated status line, friendlier first run | Done |
+| M4a Packaged app: disk image, app icon, hardened runtime, locked-down Electron | Done |
+| M4b Developer ID signing and notarisation | Needs an Apple Developer membership |
