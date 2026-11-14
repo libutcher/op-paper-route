@@ -6,6 +6,7 @@
  */
 
 import type { ApiError, ErrorCode, IncomingFile, OriginalFile, Result, VaultSummary } from "./api.js";
+import { defaultTitle } from "./title.js";
 
 /**
  * A file handed over from Finder or the menu-bar icon while a save is in
@@ -126,15 +127,14 @@ export function fileNameOf(path: string): string {
 /**
  * The title to pre-fill, and which part to select.
  *
- * The title is the whole file name, extension included: that is the title the
- * core and the CLI use by default, and the duplicate check compares titles
- * exactly, so the same file must get the same title however it is saved. Only
- * the name part is selected, so typing renames it and keeps the extension.
+ * The title is the file name without its extension: the same default the core
+ * and the CLI use, so the same file gets the same title however it is saved
+ * and the exact-match duplicate check keeps working. It is selected whole, so
+ * typing replaces it.
  */
 export function titleFor(fileName: string): { value: string; selectStart: number; selectEnd: number } {
-  const dot = fileName.lastIndexOf(".");
-  // A leading dot (".env") is part of the name, not an extension.
-  return { value: fileName, selectStart: 0, selectEnd: dot > 0 ? dot : fileName.length };
+  const value = defaultTitle(fileName);
+  return { value, selectStart: 0, selectEnd: value.length };
 }
 
 /** Labels for the vault menu. Titles repeat in real accounts, so those that do get part of their id. */

@@ -226,18 +226,18 @@ describe("handlers", () => {
     await handlers.setAccount("Example Family");
     await expect(handlers.save({ filePath: file, vaultId: VAULT, title: "  " })).resolves.toMatchObject({
       ok: true,
-      value: { title: "receipt.pdf" },
+      value: { title: "receipt" },
     });
   });
 
   it("returns core errors with their code and details, and doesn't remember the vault on failure", async () => {
     const { handlers, client, settings } = setup();
     await handlers.setAccount("Example Family");
-    client.seed({ id: "existing", title: "receipt.pdf", vaultId: VAULT, category: "Document" as never });
+    client.seed({ id: "existing", title: "receipt", vaultId: VAULT, category: "Document" as never });
 
     await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toEqual({
       ok: false,
-      error: expect.objectContaining({ code: "DUPLICATE_TITLE", details: { title: "receipt.pdf", itemId: "existing" } }),
+      error: expect.objectContaining({ code: "DUPLICATE_TITLE", details: { title: "receipt", itemId: "existing" } }),
     });
     await expect(settings.get()).resolves.toMatchObject({ lastVaultId: null });
 
@@ -347,7 +347,7 @@ describe("move to Trash after saving", () => {
 
   it("leaves the original alone when the save fails", async () => {
     const { handlers, trash, client } = await withTrashOn();
-    client.seed({ id: "existing", title: "receipt.pdf", vaultId: VAULT, category: "Document" as never });
+    client.seed({ id: "existing", title: "receipt", vaultId: VAULT, category: "Document" as never });
 
     await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
       ok: false,

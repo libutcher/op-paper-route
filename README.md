@@ -41,7 +41,7 @@ Approve the request in 1Password. The approval is 1Password's to give and take a
 ### Saving a document
 
 1. Give PaperRoute a document: right-click it in Finder and choose **Quick Actions → Save to 1Password with PaperRoute**, drop it on the window or the menu-bar icon, or press **Control-Option-P** and choose a file.
-2. The title fills in from the file name, with the name part selected so you can retype it. The vault you used last time is already chosen.
+2. The title, which becomes the item's name in 1Password, fills in from the file name without its extension, selected so you can retype it. The vault you used last time is already chosen.
 3. Press **Return**. **Esc** hides the window.
 
 If a document with the same title is already in the vault, PaperRoute asks before saving another. If you hand it a file while a save is in progress, that file waits and loads when the save finishes. With several files selected, the first is used and PaperRoute says how many were left out. Saved documents are tagged `paper-route`.
@@ -52,7 +52,7 @@ Tick **Move the original to the Trash after saving** to clean up as you go. The 
 
 ### Approving every save
 
-By default, one approval covers everything you do while the window is open, so saving three files in a row means one prompt. If you'd rather confirm each save in 1Password, tick **Ask 1Password to approve every save**. PaperRoute then lets go of the approval the moment a save finishes, and the next one asks again. The setting is remembered.
+By default, one approval covers everything you do while the window is open, so saving three files in a row means one prompt. If you'd rather confirm each save in 1Password, tick **Ask 1Password to approve every save** on the first-run screen, or later from the menu-bar icon → **1Password Account & Approval…** (which is also where you change the account). PaperRoute then lets go of the approval the moment a save finishes, and the next one asks again. The setting is remembered.
 
 ### If something doesn't work
 

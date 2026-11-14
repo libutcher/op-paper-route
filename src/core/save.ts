@@ -16,12 +16,13 @@ import type { ItemCreateParams } from "@1password/sdk";
 import { PaperRouteError, fromSdkError, messageFor } from "./errors.js";
 import { MAX_ENCODED_BYTES, NEVER_FITS_BYTES, checkFits, metadataSize, sizeHint } from "./limits.js";
 import type { Session } from "./session.js";
+import { defaultTitle } from "../shared/title.js";
 import type { SaveResult } from "../shared/types.js";
 
 export interface SaveRequest {
   filePath: string;
   vaultId: string;
-  /** Item title. Defaults to the file name. */
+  /** Item title. Defaults to the file name without its extension. */
   title?: string;
   tags?: string[];
   notes?: string;
@@ -75,7 +76,7 @@ export async function preflightFile(filePath: string): Promise<{ fileName: strin
 export async function saveDocument(session: Session, request: SaveRequest): Promise<SaveResult> {
   // 1. Exists, is a readable regular file, and isn't too large to ever fit.
   const { fileName, size } = await preflightFile(request.filePath);
-  const title = request.title?.trim() || fileName;
+  const title = request.title?.trim() || defaultTitle(fileName);
 
   // 2. Read into memory. No temp copies; the path itself is never stored in the item.
   //    The exact check below still runs on what was read, in case the file

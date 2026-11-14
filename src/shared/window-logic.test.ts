@@ -14,6 +14,7 @@ import {
   titleFor,
   vaultOptions,
 } from "./window-logic.js";
+import { defaultTitle } from "./title.js";
 
 const fail = (code: ErrorCode, details: ApiError["details"] = {}): { ok: false; error: ApiError } => ({
   ok: false,
@@ -114,17 +115,21 @@ describe("slowCallMessage", () => {
 });
 
 describe("titleFor", () => {
-  it("keeps the extension in the title but selects only the name", () => {
-    expect(titleFor("receipt.pdf")).toEqual({ value: "receipt.pdf", selectStart: 0, selectEnd: 7 });
+  it("drops the extension and selects the whole title", () => {
+    expect(titleFor("receipt.pdf")).toEqual({ value: "receipt", selectStart: 0, selectEnd: 7 });
   });
 
-  it("selects up to the last dot only", () => {
-    expect(titleFor("tax.2025.final.pdf")).toEqual({ value: "tax.2025.final.pdf", selectStart: 0, selectEnd: 14 });
+  it("drops only the last extension", () => {
+    expect(titleFor("tax.2025.final.pdf")).toEqual({ value: "tax.2025.final", selectStart: 0, selectEnd: 14 });
   });
 
-  it("selects everything when there's no extension, or the only dot is leading", () => {
-    expect(titleFor("README")).toMatchObject({ selectEnd: 6 });
-    expect(titleFor(".env")).toMatchObject({ selectEnd: 4 });
+  it("keeps the whole name when there's no extension, or the only dot is leading", () => {
+    expect(titleFor("README")).toEqual({ value: "README", selectStart: 0, selectEnd: 6 });
+    expect(titleFor(".env")).toEqual({ value: ".env", selectStart: 0, selectEnd: 4 });
+  });
+
+  it("uses the same default as the core, so duplicates are caught across the app and the CLI", () => {
+    expect(titleFor("receipt.pdf").value).toBe(defaultTitle("receipt.pdf"));
   });
 });
 

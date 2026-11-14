@@ -71,7 +71,7 @@ describe("preflightFile", () => {
 });
 
 describe("saveDocument", () => {
-  it("creates a Document item named after the file, verifies it, and reports the result", async () => {
+  it("creates a Document item titled after the file (without its extension), verifies it, and reports the result", async () => {
     const { session, client } = setup();
 
     const result = await saveDocument(session, { filePath: smallFile, vaultId: VAULT });
@@ -79,14 +79,14 @@ describe("saveDocument", () => {
     expect(result).toEqual({
       itemId: "item-1",
       vaultId: VAULT,
-      title: "receipt.txt",
+      title: "receipt",
       fileName: "receipt.txt",
       bytes: smallBytes.byteLength,
     });
     expect(client.items.create).toHaveBeenCalledWith({
       category: sdk.ItemCategory.Document,
       vaultId: VAULT,
-      title: "receipt.txt",
+      title: "receipt",
       document: { name: "receipt.txt", content: smallBytes },
     });
     expect(client.items.files.read).toHaveBeenCalledTimes(1);
@@ -232,32 +232,32 @@ describe("saveDocument", () => {
 
   it("refuses a duplicate Document title by default and names the existing item", async () => {
     const { session, client } = setup();
-    client.seed({ id: "existing", title: "receipt.txt", vaultId: VAULT, category: sdk.ItemCategory.Document });
+    client.seed({ id: "existing", title: "receipt", vaultId: VAULT, category: sdk.ItemCategory.Document });
 
     await expect(saveDocument(session, { filePath: smallFile, vaultId: VAULT })).rejects.toMatchObject({
       code: "DUPLICATE_TITLE",
-      details: { title: "receipt.txt", itemId: "existing" },
+      details: { title: "receipt", itemId: "existing" },
     });
     expect(client.items.create).not.toHaveBeenCalled();
   });
 
   it("ignores same-titled items of other categories when checking duplicates", async () => {
     const { session, client } = setup();
-    client.seed({ id: "login", title: "receipt.txt", vaultId: VAULT, category: sdk.ItemCategory.Login });
+    client.seed({ id: "login", title: "receipt", vaultId: VAULT, category: sdk.ItemCategory.Login });
 
     await expect(saveDocument(session, { filePath: smallFile, vaultId: VAULT })).resolves.toMatchObject({ itemId: "item-1" });
   });
 
   it("ignores same-titled Documents in other vaults", async () => {
     const { session, client } = setup();
-    client.seed({ id: "elsewhere", title: "receipt.txt", vaultId: "other-vault", category: sdk.ItemCategory.Document });
+    client.seed({ id: "elsewhere", title: "receipt", vaultId: "other-vault", category: sdk.ItemCategory.Document });
 
     await expect(saveDocument(session, { filePath: smallFile, vaultId: VAULT })).resolves.toMatchObject({ itemId: "item-1" });
   });
 
   it("allows duplicates when asked, without listing items first", async () => {
     const { session, client } = setup();
-    client.seed({ id: "existing", title: "receipt.txt", vaultId: VAULT, category: sdk.ItemCategory.Document });
+    client.seed({ id: "existing", title: "receipt", vaultId: VAULT, category: sdk.ItemCategory.Document });
 
     await expect(
       saveDocument(session, { filePath: smallFile, vaultId: VAULT, onDuplicate: "allow" }),
