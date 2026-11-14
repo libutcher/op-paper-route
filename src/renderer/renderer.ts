@@ -6,12 +6,14 @@
  * is filled in, the last vault is already selected, press Return.
  */
 
-import type { PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
+import type { IncomingFile, PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
 import {
   ApprovalTracker,
+  IncomingQueue,
   describeError,
   fileNameOf,
   isRetryable,
+  oneAtATimeNote,
   slowCallMessage,
   titleFor,
   vaultOptions,
@@ -29,6 +31,7 @@ const api = window.paperRoute;
 const PROMPT_HINT_AFTER_MS = 1500;
 
 const approval = new ApprovalTracker();
+const incoming = new IncomingQueue();
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -167,6 +170,27 @@ function setFile(path: string | null): void {
   updateSaveButton();
 }
 
+/**
+ * Every new file goes through here, whether it came from Finder, the
+ * menu-bar icon, a drop on the window or the file picker. During a save it
+ * waits, so the file being saved is never swapped out.
+ */
+function offerFile(file: IncomingFile): void {
+  if (incoming.offer(file, busy)) loadFile(file);
+}
+
+function loadFile(file: IncomingFile): void {
+  setFile(file.path);
+  const note = oneAtATimeNote(fileNameOf(file.path), file.othersIgnored);
+  if (note) setStatus(note, "waiting");
+}
+
+/** " “next.pdf” is waiting." when a file is queued behind the current one, else "". */
+function waitingNote(): string {
+  const next = incoming.peek();
+  return next ? ` “${fileNameOf(next.path)}” is waiting.` : "";
+}
+
 // Stop the page from ever opening a dropped file itself.
 for (const type of ["dragover", "drop"] as const) {
   document.addEventListener(type, (event) => event.preventDefault());
@@ -186,13 +210,12 @@ drop.addEventListener("drop", (event) => {
     setStatus("That item isn't a file on disk.", "error");
     return;
   }
-  setFile(path);
-  if (files.length > 1) setStatus(`Saving one file at a time; using “${first.name}”.`, "waiting");
+  offerFile({ path, othersIgnored: files.length - 1 });
 });
 
 const choose = async () => {
   const path = await api.chooseFile();
-  if (path) setFile(path);
+  if (path) offerFile({ path, othersIgnored: 0 });
 };
 chooseButton.addEventListener("click", () => void choose());
 drop.addEventListener("keydown", (event) => {
@@ -202,6 +225,12 @@ drop.addEventListener("keydown", (event) => {
   }
 });
 clearButton.addEventListener("click", () => {
+  // Removing the current file brings up the one waiting behind it, if any.
+  const next = incoming.take();
+  if (next) {
+    loadFile(next);
+    return;
+  }
   setFile(null);
   drop.focus();
 });
@@ -219,14 +248,23 @@ async function save(allowDuplicate = false): Promise<void> {
     api.save({ filePath: filePath!, vaultId: vaultSelect.value, title: titleInput.value, allowDuplicate }),
   );
   if (result.ok) {
+    const saved = `Saved “${result.value.title}” to ${vaultName}.`;
+    const next = incoming.take();
+    if (next) {
+      loadFile(next);
+      setStatus(`${saved} Next: “${fileNameOf(next.path)}”.`, "ok");
+      return;
+    }
     setFile(null);
-    setStatus(`Saved “${result.value.title}” to ${vaultName}.`, "ok");
+    setStatus(saved, "ok");
     drop.focus();
     return;
   }
+  // The save failed: the current file stays so it can be dealt with, and any
+  // file that arrived meanwhile keeps waiting (Remove brings it up).
   const { error } = result;
   if (error.code === "DUPLICATE_TITLE") {
-    setStatus(describeError(error), "waiting", [
+    setStatus(describeError(error) + waitingNote(), "waiting", [
       { label: "Save Anyway", run: () => void save(true) },
       {
         label: "Rename",
@@ -244,7 +282,7 @@ async function save(allowDuplicate = false): Promise<void> {
   // have stored the document (an expiry can be reported after the item
   // landed), so the retry runs the duplicate check again and, if a copy is
   // there, asks again rather than silently adding another.
-  setStatus(describeError(error), "error", retryable ? [{ label: "Try Again", run: () => void save() }] : []);
+  setStatus(describeError(error) + waitingNote(), "error", retryable ? [{ label: "Try Again", run: () => void save() }] : []);
 }
 
 saveView.addEventListener("submit", (event) => {
@@ -299,3 +337,10 @@ if (state.accountName) {
 } else {
   showAccountView();
 }
+
+// Files from Finder or the menu-bar icon. Listen first, then collect anything
+// that arrived while the page was loading (a Quick Action that started the
+// app), so nothing falls into the gap between the two.
+api.onIncomingFile(offerFile);
+const early = await api.takeIncomingFile();
+if (early) offerFile(early);

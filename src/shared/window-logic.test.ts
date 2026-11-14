@@ -3,9 +3,11 @@ import type { ApiError, ErrorCode, Result } from "./api.js";
 import {
   APPROVAL_IDLE_MS,
   ApprovalTracker,
+  IncomingQueue,
   describeError,
   fileNameOf,
   isRetryable,
+  oneAtATimeNote,
   slowCallMessage,
   titleFor,
   vaultOptions,
@@ -144,6 +146,40 @@ describe("vaultOptions", () => {
       { value: "bbbbbb222", label: "Personal Docs" },
       { value: "cccccc333", label: "Shopping (cccccc)" },
     ]);
+  });
+});
+
+describe("IncomingQueue", () => {
+  const file = (path: string, othersIgnored = 0) => ({ path, othersIgnored });
+
+  it("loads a file straight away when the window isn't busy", () => {
+    const q = new IncomingQueue();
+    expect(q.offer(file("/a.pdf"), false)).toBe(true);
+    expect(q.peek()).toBeNull();
+  });
+
+  it("holds a file that arrives during a save, keeping only the latest", () => {
+    const q = new IncomingQueue();
+    expect(q.offer(file("/a.pdf"), true)).toBe(false);
+    expect(q.offer(file("/b.pdf"), true)).toBe(false);
+    expect(q.peek()).toEqual(file("/b.pdf"));
+    expect(q.take()).toEqual(file("/b.pdf"));
+    expect(q.take()).toBeNull();
+  });
+
+  it("drops a waiting file when a newer one is loaded directly", () => {
+    const q = new IncomingQueue();
+    q.offer(file("/old.pdf"), true);
+    expect(q.offer(file("/new.pdf"), false)).toBe(true);
+    expect(q.take()).toBeNull();
+  });
+});
+
+describe("oneAtATimeNote", () => {
+  it("says nothing for a single file and names how many were left out", () => {
+    expect(oneAtATimeNote("a.pdf", 0)).toBeNull();
+    expect(oneAtATimeNote("a.pdf", 1)).toBe("Saving one file at a time: using “a.pdf”, not 1 other file.");
+    expect(oneAtATimeNote("a.pdf", 3)).toBe("Saving one file at a time: using “a.pdf”, not 3 other files.");
   });
 });
 

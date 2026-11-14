@@ -36,8 +36,10 @@ const inbox = new Inbox((file) => win?.webContents.send(CHANNELS.incomingFile, f
 async function receive(candidates: readonly string[], cwd: string): Promise<void> {
   const file = await firstFile(candidates, cwd);
   if (!file) return;
-  inbox.deliver(file);
+  // Show first: the window resets its status line when shown, and messages to
+  // it arrive in order, so the file (and any note about it) must come after.
   showWindow();
+  inbox.deliver(file);
 }
 
 const isDefaultApp = process.defaultApp === true;

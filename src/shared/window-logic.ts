@@ -5,7 +5,46 @@
  * must stay free of Node and DOM APIs: plain data in, plain data out.
  */
 
-import type { ApiError, ErrorCode, Result, VaultSummary } from "./api.js";
+import type { ApiError, ErrorCode, IncomingFile, Result, VaultSummary } from "./api.js";
+
+/**
+ * A file handed over from Finder or the menu-bar icon while a save is in
+ * progress waits here, so nothing is swapped out from under a save. Only the
+ * latest waiting file is kept.
+ */
+export class IncomingQueue {
+  #next: IncomingFile | null = null;
+
+  /** True if the file should be loaded now; false if it was queued because the window is busy. */
+  offer(file: IncomingFile, busy: boolean): boolean {
+    if (!busy) {
+      // Anything older that was waiting is superseded by this newer file.
+      this.#next = null;
+      return true;
+    }
+    this.#next = file;
+    return false;
+  }
+
+  /** The waiting file, if any, without removing it. */
+  peek(): IncomingFile | null {
+    return this.#next;
+  }
+
+  /** Remove and return the waiting file, if any. */
+  take(): IncomingFile | null {
+    const next = this.#next;
+    this.#next = null;
+    return next;
+  }
+}
+
+/** The note shown when several files arrive and only the first is used. */
+export function oneAtATimeNote(fileName: string, othersIgnored: number): string | null {
+  if (othersIgnored <= 0) return null;
+  const others = othersIgnored === 1 ? "1 other file" : `${othersIgnored} other files`;
+  return `Saving one file at a time: using “${fileName}”, not ${others}.`;
+}
 
 /** 1Password ends an approval after ten minutes without use. */
 export const APPROVAL_IDLE_MS = 10 * 60 * 1000;
