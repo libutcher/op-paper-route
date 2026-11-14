@@ -78,7 +78,11 @@ body {
 }
 
 .logo path {
-  fill: var(--plane);
+  fill: none;
+  stroke: var(--plane);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 
 .wordmark {
