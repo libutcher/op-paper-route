@@ -23,6 +23,8 @@ const CH = {
   takeIncomingFile: "paper-route:take-incoming-file",
   incomingFile: "paper-route:incoming-file",
   setTrashAfterSave: "paper-route:set-trash-after-save",
+  setApproveEverySave: "paper-route:set-approve-every-save",
+  approvalDropped: "paper-route:approval-dropped",
 };
 
 const api: PaperRouteApi = {
@@ -31,6 +33,10 @@ const api: PaperRouteApi = {
   listVaults: () => ipcRenderer.invoke(CH.listVaults),
   save: (args) => ipcRenderer.invoke(CH.save, args),
   setTrashAfterSave: (on) => ipcRenderer.invoke(CH.setTrashAfterSave, on),
+  setApproveEverySave: (on) => ipcRenderer.invoke(CH.setApproveEverySave, on),
+  onApprovalDropped: (listener) => {
+    ipcRenderer.on(CH.approvalDropped, () => listener());
+  },
   chooseFile: () => ipcRenderer.invoke(CH.chooseFile),
   pathForFile: (file) => webUtils.getPathForFile(file),
   hide: () => ipcRenderer.invoke(CH.hide),

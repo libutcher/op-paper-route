@@ -11,9 +11,10 @@ export interface Settings {
   accountName: string | null;
   lastVaultId: string | null;
   trashAfterSave: boolean;
+  approveEverySave: boolean;
 }
 
-const DEFAULTS: Settings = { accountName: null, lastVaultId: null, trashAfterSave: false };
+const DEFAULTS: Settings = { accountName: null, lastVaultId: null, trashAfterSave: false, approveEverySave: false };
 
 export class SettingsStore {
   readonly #file: string;
@@ -64,6 +65,7 @@ export class SettingsStore {
         lastVaultId: typeof parsed.lastVaultId === "string" && parsed.lastVaultId ? parsed.lastVaultId : null,
         // Only an explicit true turns it on: deleting files must never be a default.
         trashAfterSave: parsed.trashAfterSave === true,
+        approveEverySave: parsed.approveEverySave === true,
       };
     } catch {
       // A corrupt settings file shouldn't stop the app; start fresh.
