@@ -34,6 +34,7 @@ const MESSAGES: Record<Exclude<ErrorCode, "UNKNOWN">, string> = {
   VAULT_AMBIGUOUS: "More than one vault has that name; choose it by id",
   DUPLICATE_TITLE: "A document with that title already exists in the vault",
   VERIFY_FAILED: "The document was created but couldn't be verified",
+  INVALID_REQUEST: "The request was missing something it needs",
 };
 
 /**

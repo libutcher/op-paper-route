@@ -29,7 +29,7 @@ function toApiError(err: unknown): ApiError {
 }
 
 function invalid(message: string): { ok: false; error: ApiError } {
-  return { ok: false, error: { code: "UNKNOWN", message, details: {} } };
+  return { ok: false, error: { code: "INVALID_REQUEST", message, details: {} } };
 }
 
 async function attempt<T>(work: () => Promise<T>): Promise<Result<T>> {

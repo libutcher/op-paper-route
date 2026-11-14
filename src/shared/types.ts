@@ -22,6 +22,8 @@ export type ErrorCode =
   | "DUPLICATE_TITLE"
   /** The item was created but reading it back failed or returned different bytes. */
   | "VERIFY_FAILED"
+  /** A request from the window was missing or malformed; retrying it unchanged cannot help. */
+  | "INVALID_REQUEST"
   | "UNKNOWN";
 
 export type ErrorDetails = Readonly<Record<string, string | number | boolean>>;

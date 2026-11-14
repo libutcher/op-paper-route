@@ -6,7 +6,7 @@
  * is filled in, the last vault is already selected, press Return.
  */
 
-import type { ApiError, PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
+import type { ApiError, ErrorCode, PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
 
 declare global {
   interface Window {
@@ -15,6 +15,9 @@ declare global {
 }
 
 const api = window.paperRoute;
+
+/** Errors where the same request may succeed if sent again. */
+const RETRYABLE: ReadonlySet<ErrorCode> = new Set(["NOT_AUTHORIZED", "SESSION_EXPIRED", "RATE_LIMITED", "APP_NOT_FOUND", "UNKNOWN"]);
 
 /** After this long without an answer, 1Password is probably showing its prompt. */
 const PROMPT_HINT_AFTER_MS = 1500;
@@ -248,7 +251,10 @@ async function save(allowDuplicate = false): Promise<void> {
     ]);
     return;
   }
-  const retryable = error.code === "NOT_AUTHORIZED" || error.code === "SESSION_EXPIRED" || error.code === "UNKNOWN";
+  // Offer Try Again only where trying again can work. Input problems
+  // (INVALID_REQUEST), a bad file or a failed verification need something to
+  // change first.
+  const retryable = RETRYABLE.has(error.code);
   setStatus(describeError(error), "error", retryable ? [{ label: "Try Again", run: () => void save(allowDuplicate) }] : []);
 }
 

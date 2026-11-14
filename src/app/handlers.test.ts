@@ -87,7 +87,7 @@ describe("handlers", () => {
   it("rejects an empty or non-string account name", async () => {
     const { handlers } = setup();
     for (const bad of ["", "   ", 42, null]) {
-      await expect(handlers.setAccount(bad)).resolves.toMatchObject({ ok: false });
+      await expect(handlers.setAccount(bad)).resolves.toMatchObject({ ok: false, error: { code: "INVALID_REQUEST" } });
     }
   });
 
@@ -186,7 +186,10 @@ describe("handlers", () => {
       { filePath: file, vaultId: VAULT, title: 7 },
     ];
     for (const args of bad) {
-      await expect(handlers.save(args), JSON.stringify(args)).resolves.toMatchObject({ ok: false });
+      await expect(handlers.save(args), JSON.stringify(args)).resolves.toMatchObject({
+        ok: false,
+        error: { code: "INVALID_REQUEST" },
+      });
     }
     expect(connect).not.toHaveBeenCalled();
   });
