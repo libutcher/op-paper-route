@@ -31,7 +31,7 @@ const api = {
   save: async (args) => {
     await wait(1400);
     state.lastVaultId = args.vaultId;
-    const title = args.title?.trim() || "Dentist receipt.pdf";
+    const title = args.title?.trim() || "Dentist receipt";
     return {
       ok: true,
       value: {
@@ -56,6 +56,8 @@ const api = {
   onIncomingFile: (listener) => {
     onIncoming = listener;
   },
+  onApprovalDropped: () => {},
+  onShowSetup: () => {},
 };
 
 ipcRenderer.on("demo:incoming", (_event, file) => onIncoming?.(file));

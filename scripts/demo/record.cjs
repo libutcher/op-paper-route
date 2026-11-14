@@ -21,6 +21,7 @@ const PAGE = path.join(REPO, "dist", "renderer", "index.html");
 const theme = process.argv.includes("light") ? "light" : "dark";
 const OUT = process.argv.find((a) => a.endsWith(".gif")) ?? path.join(REPO, "docs", `demo-${theme}.gif`);
 const SCALE = 0.75; // of Retina size: crisp, but not huge
+const CORNER_RADIUS = 12; // macOS window corners
 
 const FILE = { path: "/Users/demo/Downloads/Dentist receipt.pdf", othersIgnored: 0 };
 const NEW_TITLE = "Dentist visit, March";
@@ -55,13 +56,18 @@ async function click(win, selector) {
 
 app.whenReady().then(async () => {
   nativeTheme.themeSource = theme;
+  // Frameless and transparent, so the page can round its own corners and the
+  // frames keep transparent corners, like a Mac window floating on the README.
+  // The size is the real window's content area (its 440×508 includes a title bar).
   const win = new BrowserWindow({
     width: 440,
-    height: 480,
+    height: 476,
     show: false,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
     resizable: false,
     title: "PaperRoute demo",
-    backgroundColor: theme === "dark" ? "#1e1e20" : "#f6f6f4",
     webPreferences: { preload: path.join(__dirname, "preload.cjs"), sandbox: true, contextIsolation: true },
   });
   win.webContents.on("console-message", (e) => {
@@ -94,6 +100,13 @@ app.whenReady().then(async () => {
   // ---- The story ----
   const painted = new Promise((resolve) => win.once("ready-to-show", resolve));
   const loaded = win.loadFile(PAGE); // "Connecting to 1Password…", then "Waiting for 1Password", then vaults
+  win.webContents.on("dom-ready", () => {
+    void win.webContents.insertCSS(`
+      html { background: transparent !important; }
+      body { border-radius: ${CORNER_RADIUS}px; overflow: hidden;
+             box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.25); }
+    `);
+  });
   await painted;
   win.show();
   started = Date.now();
