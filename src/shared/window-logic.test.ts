@@ -9,6 +9,7 @@ import {
   isRetryable,
   oneAtATimeNote,
   savedMessage,
+  savedThenNext,
   slowCallMessage,
   titleFor,
   vaultOptions,
@@ -181,6 +182,17 @@ describe("oneAtATimeNote", () => {
     expect(oneAtATimeNote("a.pdf", 0)).toBeNull();
     expect(oneAtATimeNote("a.pdf", 1)).toBe("Saving one file at a time: using “a.pdf”, not 1 other file.");
     expect(oneAtATimeNote("a.pdf", 3)).toBe("Saving one file at a time: using “a.pdf”, not 3 other files.");
+  });
+});
+
+describe("savedThenNext", () => {
+  it("names the next file, and keeps the note when files were left out", () => {
+    expect(savedThenNext("Saved “a.pdf” to Docs.", { path: "/x/b.pdf", othersIgnored: 0 })).toBe(
+      "Saved “a.pdf” to Docs. Next: “b.pdf”.",
+    );
+    expect(savedThenNext("Saved “a.pdf” to Docs.", { path: "/x/b.pdf", othersIgnored: 2 })).toBe(
+      "Saved “a.pdf” to Docs. Next: “b.pdf”. Saving one file at a time: using “b.pdf”, not 2 other files.",
+    );
   });
 });
 

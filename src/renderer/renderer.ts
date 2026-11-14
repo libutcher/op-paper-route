@@ -15,6 +15,7 @@ import {
   isRetryable,
   oneAtATimeNote,
   savedMessage,
+  savedThenNext,
   slowCallMessage,
   titleFor,
   vaultOptions,
@@ -292,7 +293,7 @@ async function save(allowDuplicate = false): Promise<void> {
     const next = incoming.take();
     if (next) {
       loadFile(next);
-      setStatus(`${saved.text} Next: “${fileNameOf(next.path)}”.`, saved.tone);
+      setStatus(savedThenNext(saved.text, next), saved.tone);
       return;
     }
     setFile(null);

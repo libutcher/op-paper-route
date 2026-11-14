@@ -147,6 +147,17 @@ export function vaultOptions(vaults: readonly VaultSummary[]): Array<{ value: st
   }));
 }
 
+/**
+ * The message after a save when a waiting file comes up next. It keeps the
+ * "one file at a time" note for that file, which would otherwise be lost: the
+ * note is set when the file loads and this message replaces it immediately.
+ */
+export function savedThenNext(savedText: string, next: IncomingFile): string {
+  const name = fileNameOf(next.path);
+  const note = oneAtATimeNote(name, next.othersIgnored);
+  return note ? `${savedText} Next: “${name}”. ${note}` : `${savedText} Next: “${name}”.`;
+}
+
 /** The success message, including what happened to the original when the Trash option is on. */
 export function savedMessage(title: string, vaultName: string, original: OriginalFile): { text: string; tone: "ok" | "waiting" } {
   const saved = `Saved “${title}” to ${vaultName}.`;
