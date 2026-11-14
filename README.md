@@ -24,7 +24,7 @@ What PaperRoute never does: it stores no tokens or passwords, uses no service ac
 
 ## Installation
 
-1. Open `PaperRoute-<version>-<arch>.dmg` and drag **PaperRoute** to **Applications**.
+1. Download `PaperRoute-<version>-arm64.dmg` from the [latest release](https://github.com/libutcher/op-paper-route/releases/latest), open it, and drag **PaperRoute** to **Applications**. Each release also lists the file's SHA-256 checksum; to check your download, run `shasum -a 256` on it and compare.
 2. Open it from Applications. PaperRoute isn't signed with an Apple Developer ID yet, so macOS may refuse the first time: go to **System Settings → Privacy & Security**, find the message about PaperRoute, and choose **Open Anyway**. You only do this once.
 3. Click the paper-plane icon in the menu bar and choose **Install Finder Quick Action…**. The same menu item removes it again.
 
