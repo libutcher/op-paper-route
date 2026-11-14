@@ -22,7 +22,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -156,14 +156,28 @@ async function writePlist(path, value) {
   }
 }
 
-/** Build the workflow bundle at `bundlePath` (replacing any old one) with the given shell script. */
+/**
+ * Build the workflow bundle at `bundlePath` with the given shell script,
+ * replacing any old one. The new bundle is built and checked beside the old
+ * one and only swapped in once it's complete, so a failed install leaves the
+ * existing Quick Action working.
+ */
 export async function writeWorkflow(bundlePath, command) {
   if (!bundlePath.endsWith(".workflow")) throw new Error(`Refusing to write a workflow to ${bundlePath}`);
-  await removeWorkflow(bundlePath);
-  const contents = join(bundlePath, "Contents");
-  await mkdir(contents, { recursive: true });
-  await writePlist(join(contents, "Info.plist"), infoPlist());
-  await writePlist(join(contents, "document.wflow"), documentWflow(command));
+  // Not a .workflow name, so macOS never picks up a half-built bundle as a service.
+  const staging = `${bundlePath}.staging-${process.pid}`;
+  await rm(staging, { recursive: true, force: true });
+  try {
+    const contents = join(staging, "Contents");
+    await mkdir(contents, { recursive: true });
+    await writePlist(join(contents, "Info.plist"), infoPlist());
+    await writePlist(join(contents, "document.wflow"), documentWflow(command));
+    await removeWorkflow(bundlePath);
+    await rename(staging, bundlePath);
+  } catch (err) {
+    await rm(staging, { recursive: true, force: true });
+    throw err;
+  }
 }
 
 /** Remove the workflow bundle at `bundlePath`, if it's there. Only ever a *.workflow bundle. */

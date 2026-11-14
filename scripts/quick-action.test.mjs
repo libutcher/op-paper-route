@@ -73,6 +73,21 @@ describe.skipIf(!onMac)("writeWorkflow", () => {
     expect(await readFile(log, "utf8")).toBe(`${input}\n`);
   }, 40_000);
 
+  it("keeps the installed workflow when building the new one fails", async () => {
+    const bundle = join(dir, "Keep.workflow");
+    await writeWorkflow(bundle, "echo working");
+    const doc = join(bundle, "Contents", "document.wflow");
+    const command = () => execFileSync("plutil", ["-extract", "actions.0.action.ActionParameters.COMMAND_STRING", "raw", "-o", "-", doc]).toString().trim();
+    expect(command()).toBe("echo working");
+
+    // A BigInt can't be turned into JSON, so writing the new plist throws.
+    await expect(writeWorkflow(bundle, 1n)).rejects.toThrow();
+
+    expect(command()).toBe("echo working");
+    const { readdir } = await import("node:fs/promises");
+    expect((await readdir(dir)).filter((name) => name.includes(".staging-"))).toEqual([]);
+  });
+
   it("replaces an existing workflow cleanly", async () => {
     const bundle = join(dir, "Replace.workflow");
     await writeWorkflow(bundle, "echo one");
