@@ -11,19 +11,27 @@ import sdk from "@1password/sdk";
 
 const MAX_BYTES = 50 * 1024 * 1024; // SDK message limit is 50 MB
 
+const USAGE = "usage: node spike/upload.mjs <file> [--account NAME] [--vault NAME]";
+
+function usageError(message) {
+  console.error(`${message}\n${USAGE}`);
+  process.exit(2);
+}
+
+// Returns the value after `flag`, or `fallback` if the flag is absent.
+// A flag that is present but has no value is an error, not a silent fallback.
 function arg(flag, fallback) {
   const i = process.argv.indexOf(flag);
-  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+  if (i === -1) return fallback;
+  const value = process.argv[i + 1];
+  if (value === undefined || value.startsWith("--")) usageError(`${flag} needs a value`);
+  return value;
 }
 
 const filePath = process.argv[2];
+if (!filePath || filePath.startsWith("--")) usageError("missing <file>");
 const accountName = arg("--account", "Butcher Family");
 const vaultName = arg("--vault", "PaperRouteTest");
-
-if (!filePath || filePath.startsWith("--")) {
-  console.error("usage: node spike/upload.mjs <file> [--account NAME] [--vault NAME]");
-  process.exit(2);
-}
 
 const t0 = performance.now();
 const lap = (label) => console.log(`[${((performance.now() - t0) / 1000).toFixed(1)}s] ${label}`);
