@@ -1,5 +1,5 @@
 // M0 spike: prove the full path works end to end.
-//   DesktopAuth -> vaults.list -> items.create(Document) -> items.get read-back
+//   DesktopAuth -> vaults.list -> items.create(Document) -> files.read read-back
 //
 // Usage: node spike/upload.mjs <file> [--account "Butcher Family"] [--vault "PaperRouteTest"]
 //
@@ -98,8 +98,8 @@ const created = await client.items.create({
 lap(`created item ${created.id} "${created.title}" in "${vault.title}"`);
 
 // 5. Read it back and verify the bytes match.
-const fetched = await client.items.get(vault.id, created.id);
-const roundTrip = await client.items.files.read(vault.id, fetched.id, fetched.document);
+// items.create already returns the document's FileAttributes, so no items.get.
+const roundTrip = await client.items.files.read(vault.id, created.id, created.document);
 const same =
   roundTrip.byteLength === content.byteLength &&
   roundTrip.every((b, i) => b === content[i]);
