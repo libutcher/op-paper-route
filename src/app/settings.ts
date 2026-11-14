@@ -1,7 +1,7 @@
 /**
- * Tiny persisted settings: the account name and the last vault used. Stored
- * as JSON in Electron's userData folder. Nothing secret lives here; vault ids
- * and an account name are not credentials.
+ * Tiny persisted settings: the account name, the last vault used, and the
+ * Trash option. Stored as JSON in Electron's userData folder. Nothing secret
+ * lives here; vault ids and an account name are not credentials.
  */
 
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
@@ -10,9 +10,10 @@ import { dirname } from "node:path";
 export interface Settings {
   accountName: string | null;
   lastVaultId: string | null;
+  trashAfterSave: boolean;
 }
 
-const DEFAULTS: Settings = { accountName: null, lastVaultId: null };
+const DEFAULTS: Settings = { accountName: null, lastVaultId: null, trashAfterSave: false };
 
 export class SettingsStore {
   readonly #file: string;
@@ -61,6 +62,8 @@ export class SettingsStore {
       return {
         accountName: typeof parsed.accountName === "string" && parsed.accountName ? parsed.accountName : null,
         lastVaultId: typeof parsed.lastVaultId === "string" && parsed.lastVaultId ? parsed.lastVaultId : null,
+        // Only an explicit true turns it on: deleting files must never be a default.
+        trashAfterSave: parsed.trashAfterSave === true,
       };
     } catch {
       // A corrupt settings file shouldn't stop the app; start fresh.

@@ -20,6 +20,9 @@ const CH = {
   chooseFile: "paper-route:choose-file",
   hide: "paper-route:hide",
   shown: "paper-route:shown",
+  takeIncomingFile: "paper-route:take-incoming-file",
+  incomingFile: "paper-route:incoming-file",
+  setTrashAfterSave: "paper-route:set-trash-after-save",
 };
 
 const api: PaperRouteApi = {
@@ -27,12 +30,20 @@ const api: PaperRouteApi = {
   setAccount: (accountName) => ipcRenderer.invoke(CH.setAccount, accountName),
   listVaults: () => ipcRenderer.invoke(CH.listVaults),
   save: (args) => ipcRenderer.invoke(CH.save, args),
+  setTrashAfterSave: (on) => ipcRenderer.invoke(CH.setTrashAfterSave, on),
   chooseFile: () => ipcRenderer.invoke(CH.chooseFile),
   pathForFile: (file) => webUtils.getPathForFile(file),
   hide: () => ipcRenderer.invoke(CH.hide),
   onShown: (listener) => {
     // Don't hand the IPC event object to the page.
     ipcRenderer.on(CH.shown, () => listener());
+  },
+  takeIncomingFile: () => ipcRenderer.invoke(CH.takeIncomingFile),
+  onIncomingFile: (listener) => {
+    // Pass on only the data, never the IPC event object.
+    ipcRenderer.on(CH.incomingFile, (_event, file: Parameters<typeof listener>[0]) =>
+      listener({ path: String(file.path), othersIgnored: Number(file.othersIgnored) || 0 }),
+    );
   },
 };
 

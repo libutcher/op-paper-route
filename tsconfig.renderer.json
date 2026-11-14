@@ -15,5 +15,7 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "include": ["src/renderer/**/*.ts", "src/shared/**/*.ts"]
+  "include": ["src/renderer/**/*.ts", "src/shared/**/*.ts"],
+  // Tests run under Vitest in Node, not in the window.
+  "exclude": ["src/**/*.test.ts"]
 }

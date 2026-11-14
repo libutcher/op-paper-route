@@ -6,7 +6,20 @@
  * is filled in, the last vault is already selected, press Return.
  */
 
-import type { ApiError, ErrorCode, PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
+import type { IncomingFile, PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
+import {
+  ApprovalTracker,
+  IncomingQueue,
+  describeError,
+  fileNameOf,
+  isRetryable,
+  oneAtATimeNote,
+  savedMessage,
+  savedThenNext,
+  slowCallMessage,
+  titleFor,
+  vaultOptions,
+} from "../shared/window-logic.js";
 
 declare global {
   interface Window {
@@ -16,13 +29,11 @@ declare global {
 
 const api = window.paperRoute;
 
-/** Errors where the same request may succeed if sent again. */
-const RETRYABLE: ReadonlySet<ErrorCode> = new Set(["NOT_AUTHORIZED", "SESSION_EXPIRED", "RATE_LIMITED", "APP_NOT_FOUND", "UNKNOWN"]);
-
 /** After this long without an answer, say something so the window doesn't look frozen. */
 const PROMPT_HINT_AFTER_MS = 1500;
-/** 1Password ends an approval after ten minutes without use. */
-const APPROVAL_IDLE_MS = 10 * 60 * 1000;
+
+const approval = new ApprovalTracker();
+const incoming = new IncomingQueue();
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -40,11 +51,15 @@ const clearButton = $<HTMLButtonElement>("clear-file");
 const titleInput = $<HTMLInputElement>("title");
 const vaultSelect = $<HTMLSelectElement>("vault");
 const saveButton = $<HTMLButtonElement>("save");
+const trashCheckbox = $<HTMLInputElement>("trash-after-save");
 const statusEl = $<HTMLDivElement>("status");
 const statusActions = $<HTMLDivElement>("status-actions");
 
 let filePath: string | null = null;
+/** A call to the main process is in flight (loading vaults or saving). */
 let busy = false;
+/** Specifically a save is in flight; new files wait until it's done. */
+let saving = false;
 let vaultsLoaded = false;
 /** The vault to preselect once vaults load: the one used last time. */
 let preferredVaultId: string | null = null;
@@ -53,7 +68,26 @@ let preferredVaultId: string | null = null;
 
 type Tone = "info" | "ok" | "waiting" | "error";
 
+/**
+ * Whether the window is on screen, as far as this page knows: false until
+ * the main process says it has been shown, and false again once hidden.
+ * (A window that has never been shown still reports itself "visible", so
+ * document.visibilityState alone can't tell.)
+ */
+let onScreen = false;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") onScreen = false;
+});
+
+/**
+ * True when the current status was set while the window was off screen,
+ * e.g. the "one file at a time" note for a Quick Action that started the app.
+ * The user hasn't seen it yet, so showing the window must not clear it.
+ */
+let statusUnseen = false;
+
 function setStatus(text: string, tone: Tone = "info", actions: Array<{ label: string; run: () => void }> = []): void {
+  statusUnseen = !onScreen && text !== "";
   statusEl.textContent = text;
   statusEl.className = `status ${tone === "info" ? "" : tone}`;
   statusActions.replaceChildren(
@@ -77,64 +111,18 @@ async function withPromptHint<T>(working: string, call: () => Promise<Result<T>>
   busy = true;
   updateSaveButton();
   setStatus(working, "info");
-  // Only tell the user to approve something when a prompt is likely. With a
-  // recent approval a slow call is usually just slow (a big upload), though
-  // 1Password can still prompt if it was locked meanwhile, so say that softly.
-  const hint = setTimeout(
-    () =>
-      promptLikely()
-        ? setStatus("Waiting for 1Password — approve the request in the 1Password app.", "waiting")
-        : setStatus(`${working} Still working. If 1Password asks for approval, approve it there.`, "info"),
-    PROMPT_HINT_AFTER_MS,
-  );
+  const hint = setTimeout(() => {
+    const { text, tone } = slowCallMessage(working, approval.promptLikely());
+    setStatus(text, tone);
+  }, PROMPT_HINT_AFTER_MS);
   try {
     const result = await call();
-    noteOutcome(result);
+    approval.note(result);
     return result;
   } finally {
     clearTimeout(hint);
     busy = false;
     updateSaveButton();
-  }
-}
-
-/** When 1Password last answered a request from this window, or null if it hasn't (or its approval has ended). */
-let lastAnsweredAt: number | null = null;
-
-/** Errors that mean the approval is missing or gone, so the next call will prompt. */
-const APPROVAL_LOST: ReadonlySet<ErrorCode> = new Set(["NOT_AUTHORIZED", "SESSION_EXPIRED", "ACCOUNT_NOT_FOUND", "APP_NOT_FOUND"]);
-/** Errors raised before 1Password is contacted; they say nothing about approval. */
-const LOCAL_ONLY: ReadonlySet<ErrorCode> = new Set(["INVALID_REQUEST", "FILE_UNREADABLE", "FILE_TOO_LARGE"]);
-
-function noteOutcome(result: Result<unknown>): void {
-  if (result.ok) lastAnsweredAt = Date.now();
-  else if (APPROVAL_LOST.has(result.error.code)) lastAnsweredAt = null;
-  else if (!LOCAL_ONLY.has(result.error.code)) lastAnsweredAt = Date.now();
-}
-
-/** True when the next call will probably show 1Password's approval prompt. */
-function promptLikely(): boolean {
-  return lastAnsweredAt === null || Date.now() - lastAnsweredAt > APPROVAL_IDLE_MS;
-}
-
-function describeError(error: ApiError): string {
-  const d = error.details;
-  const mb = (n: unknown) => `${(Number(n) / 1024 / 1024).toFixed(1)} MB`;
-  switch (error.code) {
-    case "NOT_AUTHORIZED":
-      return "1Password didn't approve the request.";
-    case "SESSION_EXPIRED":
-      return "The 1Password session ended. Try again to approve a new one.";
-    case "APP_NOT_FOUND":
-      return "1Password isn't running, or “Integrate with 1Password SDKs” is off in Settings → Developer.";
-    case "FILE_TOO_LARGE":
-      return "encoded" in d
-        ? `Too large: this file needs ${mb(d.encoded)} and the limit is ${mb(d.limit)}.`
-        : `Too large: ${mb(d.bytes)}, and nothing over ${mb(d.maxFileBytes)} can fit.`;
-    case "DUPLICATE_TITLE":
-      return `A document called “${String(d.title)}” is already in this vault.`;
-    default:
-      return error.message;
   }
 }
 
@@ -157,7 +145,7 @@ accountView.addEventListener("submit", async (event) => {
   }
   vaultsLoaded = false;
   // A different account means a new session, which 1Password will ask about.
-  lastAnsweredAt = null;
+  approval.reset();
   showSaveView(result.value.lastVaultId);
 });
 
@@ -182,12 +170,7 @@ async function loadVaults(preferredId: string | null): Promise<void> {
 }
 
 function fillVaults(vaults: VaultSummary[], preferredId: string | null): void {
-  // Vault titles repeat in real accounts, so disambiguate those that do.
-  const counts = new Map<string, number>();
-  for (const v of vaults) counts.set(v.title, (counts.get(v.title) ?? 0) + 1);
-  vaultSelect.replaceChildren(
-    ...vaults.map((v) => new Option((counts.get(v.title) ?? 0) > 1 ? `${v.title} (${v.id.slice(0, 6)})` : v.title, v.id)),
-  );
+  vaultSelect.replaceChildren(...vaultOptions(vaults).map(({ value, label }) => new Option(label, value)));
   if (preferredId && vaults.some((v) => v.id === preferredId)) vaultSelect.value = preferredId;
   vaultSelect.disabled = vaults.length === 0;
 }
@@ -196,25 +179,46 @@ function fillVaults(vaults: VaultSummary[], preferredId: string | null): void {
 
 function setFile(path: string | null): void {
   filePath = path;
-  const name = path ? (path.split("/").pop() ?? path) : "";
+  const name = path ? fileNameOf(path) : "";
   fileNameEl.textContent = name;
   fileNameEl.title = path ?? "";
   dropEmpty.hidden = path !== null;
   dropFile.hidden = path === null;
   drop.classList.toggle("has-file", path !== null);
-  // Pre-fill the title with the whole file name, extension included. That is
-  // the title the core and the CLI use by default, and the duplicate check
-  // compares titles exactly, so the same file must get the same title however
-  // it is saved.
-  titleInput.value = name;
+  const title = titleFor(name);
+  titleInput.value = title.value;
   if (path) {
     setStatus("");
     titleInput.focus();
-    // Select just the name part, so typing renames it and keeps the extension.
-    const dot = name.lastIndexOf(".");
-    titleInput.setSelectionRange(0, dot > 0 ? dot : name.length);
+    titleInput.setSelectionRange(title.selectStart, title.selectEnd);
   }
   updateSaveButton();
+}
+
+/**
+ * Every new file goes through here, whether it came from Finder, the
+ * menu-bar icon, a drop on the window or the file picker. During a save it
+ * waits, so the file being saved is never swapped out.
+ *
+ * Only a save makes it wait, not any call to 1Password. On a fresh start the
+ * window is loading vaults (and waiting for approval) just as the Quick
+ * Action's file arrives; that file must show up straight away, not sit in
+ * the queue that only a finished save releases.
+ */
+function offerFile(file: IncomingFile): void {
+  if (incoming.offer(file, saving)) loadFile(file);
+}
+
+function loadFile(file: IncomingFile): void {
+  setFile(file.path);
+  const note = oneAtATimeNote(fileNameOf(file.path), file.othersIgnored);
+  if (note) setStatus(note, "waiting");
+}
+
+/** " “next.pdf” is waiting." when a file is queued behind the current one, else "". */
+function waitingNote(): string {
+  const next = incoming.peek();
+  return next ? ` “${fileNameOf(next.path)}” is waiting.` : "";
 }
 
 // Stop the page from ever opening a dropped file itself.
@@ -236,13 +240,12 @@ drop.addEventListener("drop", (event) => {
     setStatus("That item isn't a file on disk.", "error");
     return;
   }
-  setFile(path);
-  if (files.length > 1) setStatus(`Saving one file at a time; using “${first.name}”.`, "waiting");
+  offerFile({ path, othersIgnored: files.length - 1 });
 });
 
 const choose = async () => {
   const path = await api.chooseFile();
-  if (path) setFile(path);
+  if (path) offerFile({ path, othersIgnored: 0 });
 };
 chooseButton.addEventListener("click", () => void choose());
 drop.addEventListener("keydown", (event) => {
@@ -252,6 +255,16 @@ drop.addEventListener("keydown", (event) => {
   }
 });
 clearButton.addEventListener("click", () => {
+  // The file can't be removed while it's being saved (the button is disabled
+  // then too): that would bring up the waiting file mid-save, and the save
+  // finishing would then clear it.
+  if (saving) return;
+  // Removing the current file brings up the one waiting behind it, if any.
+  const next = incoming.take();
+  if (next) {
+    loadFile(next);
+    return;
+  }
   setFile(null);
   drop.focus();
 });
@@ -260,23 +273,39 @@ clearButton.addEventListener("click", () => {
 
 function updateSaveButton(): void {
   saveButton.disabled = busy || !filePath || !vaultsLoaded || !vaultSelect.value;
+  clearButton.disabled = saving;
 }
 
 async function save(allowDuplicate = false): Promise<void> {
   if (!filePath || busy || !vaultSelect.value) return;
   const vaultName = vaultSelect.selectedOptions[0]?.textContent ?? "the vault";
-  const result = await withPromptHint("Saving…", () =>
-    api.save({ filePath: filePath!, vaultId: vaultSelect.value, title: titleInput.value, allowDuplicate }),
-  );
+  const request = { filePath, vaultId: vaultSelect.value, title: titleInput.value, allowDuplicate };
+  saving = true;
+  let result;
+  try {
+    result = await withPromptHint("Saving…", () => api.save(request));
+  } finally {
+    saving = false;
+    updateSaveButton();
+  }
   if (result.ok) {
+    const saved = savedMessage(result.value.title, vaultName, result.value.original);
+    const next = incoming.take();
+    if (next) {
+      loadFile(next);
+      setStatus(savedThenNext(saved.text, next), saved.tone);
+      return;
+    }
     setFile(null);
-    setStatus(`Saved “${result.value.title}” to ${vaultName}.`, "ok");
+    setStatus(saved.text, saved.tone);
     drop.focus();
     return;
   }
+  // The save failed: the current file stays so it can be dealt with, and any
+  // file that arrived meanwhile keeps waiting (Remove brings it up).
   const { error } = result;
   if (error.code === "DUPLICATE_TITLE") {
-    setStatus(describeError(error), "waiting", [
+    setStatus(describeError(error) + waitingNote(), "waiting", [
       { label: "Save Anyway", run: () => void save(true) },
       {
         label: "Rename",
@@ -289,15 +318,12 @@ async function save(allowDuplicate = false): Promise<void> {
     ]);
     return;
   }
-  // Offer Try Again only where trying again can work. Input problems
-  // (INVALID_REQUEST), a bad file or a failed verification need something to
-  // change first.
-  const retryable = RETRYABLE.has(error.code);
+  const retryable = isRetryable(error.code);
   // Try Again never carries "Save Anyway" over. A failed attempt may still
   // have stored the document (an expiry can be reported after the item
   // landed), so the retry runs the duplicate check again and, if a copy is
   // there, asks again rather than silently adding another.
-  setStatus(describeError(error), "error", retryable ? [{ label: "Try Again", run: () => void save() }] : []);
+  setStatus(describeError(error) + waitingNote(), "error", retryable ? [{ label: "Try Again", run: () => void save() }] : []);
 }
 
 saveView.addEventListener("submit", (event) => {
@@ -309,6 +335,20 @@ vaultSelect.addEventListener("change", () => {
   updateSaveButton();
 });
 titleInput.addEventListener("input", clearStalePrompt);
+
+trashCheckbox.addEventListener("change", async () => {
+  const result = await api.setTrashAfterSave(trashCheckbox.checked);
+  if (result.ok) {
+    // Match what was stored. Settings updates are applied in the order they're
+    // sent, so after quick repeated clicks the last answer is the final state.
+    trashCheckbox.checked = result.value.trashAfterSave;
+    return;
+  }
+  // Show what's actually in effect, never what was merely clicked or guessed:
+  // with overlapping clicks, "the opposite of this click" may be wrong.
+  trashCheckbox.checked = (await api.getState()).trashAfterSave;
+  setStatus(`Couldn't change the Trash option: ${result.error.message}`, "error");
+});
 
 /**
  * Remove leftover action buttons (Save Anyway, Try Again). They were offered
@@ -327,11 +367,15 @@ document.addEventListener("keydown", (event) => {
 });
 
 api.onShown(() => {
+  const unseen = statusUnseen;
+  onScreen = true;
+  statusUnseen = false;
   if (saveView.hidden) return;
   (filePath ? titleInput : drop).focus();
   if (busy) return;
   // Start clean: no stale result or prompt from before the window was hidden.
-  setStatus(vaultsLoaded && !filePath ? "Ready." : "");
+  // A message set while the window was off screen is new, not stale: keep it.
+  if (!unseen) setStatus(vaultsLoaded && !filePath ? "Ready." : "");
   // If the vaults never loaded (the approval was denied, say), reopening the
   // window is a natural moment to try again.
   if (!vaultsLoaded) void loadVaults(preferredVaultId);
@@ -346,9 +390,17 @@ function showSaveView(lastVaultId: string | null): void {
 }
 
 const state = await api.getState();
+trashCheckbox.checked = state.trashAfterSave;
 if (state.accountName) {
   accountInput.value = state.accountName;
   showSaveView(state.lastVaultId);
 } else {
   showAccountView();
 }
+
+// Files from Finder or the menu-bar icon. Listen first, then collect anything
+// that arrived while the page was loading (a Quick Action that started the
+// app), so nothing falls into the gap between the two.
+api.onIncomingFile(offerFile);
+const early = await api.takeIncomingFile();
+if (early) offerFile(early);

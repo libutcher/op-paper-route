@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,39 +27,49 @@ afterEach(async () => {
 function setup(client: FakeClient = fakeClient([{ id: VAULT, title: "PaperRouteTest" }])) {
   const connect = vi.fn<Connect>(async () => client);
   const settings = new SettingsStore(settingsFile);
-  const handlers = createHandlers({ settings, integrationName: "tests", integrationVersion: "0", connect });
-  return { handlers, settings, client, connect };
+  // Stands in for Electron's shell.trashItem: really removes the file, so tests can see it's gone.
+  const trash = vi.fn(async (path: string) => {
+    await rm(path);
+  });
+  const handlers = createHandlers({ settings, integrationName: "tests", integrationVersion: "0", connect, trash });
+  return { handlers, settings, client, connect, trash };
 }
 
 describe("settings", () => {
   it("starts empty, persists updates, and survives a corrupt file", async () => {
     const { settings } = setup();
-    await expect(settings.get()).resolves.toEqual({ accountName: null, lastVaultId: null });
+    await expect(settings.get()).resolves.toEqual({ accountName: null, lastVaultId: null, trashAfterSave: false });
 
-    await settings.update({ accountName: "Butcher Family" });
+    await settings.update({ accountName: "Example Family" });
     await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({
-      accountName: "Butcher Family",
+      accountName: "Example Family",
       lastVaultId: null,
+      trashAfterSave: false,
     });
 
     await writeFile(settingsFile, "{not json");
-    await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({ accountName: null, lastVaultId: null });
+    await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({
+      accountName: null,
+      lastVaultId: null,
+      trashAfterSave: false,
+    });
   });
 
   it("keeps both changes when two updates overlap", async () => {
     const settings = new SettingsStore(settingsFile);
 
     const [first, second] = await Promise.all([
-      settings.update({ accountName: "Butcher Family" }),
+      settings.update({ accountName: "Example Family" }),
       settings.update({ lastVaultId: "v-test" }),
     ]);
 
-    expect(first).toEqual({ accountName: "Butcher Family", lastVaultId: null });
-    expect(second).toEqual({ accountName: "Butcher Family", lastVaultId: "v-test" });
+    expect(first).toEqual({ accountName: "Example Family", lastVaultId: null, trashAfterSave: false });
+    expect(second).toEqual({ accountName: "Example Family", lastVaultId: "v-test", trashAfterSave: false });
     // And on disk, read fresh.
     await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({
-      accountName: "Butcher Family",
+      accountName: "Example Family",
       lastVaultId: "v-test",
+      trashAfterSave: false,
     });
     // No temp files left behind.
     const { readdir } = await import("node:fs/promises");
@@ -93,17 +104,17 @@ describe("handlers", () => {
 
   it("stores a trimmed account name and lists vaults with it", async () => {
     const { handlers, connect } = setup();
-    await expect(handlers.setAccount("  Butcher Family ")).resolves.toMatchObject({
+    await expect(handlers.setAccount("  Example Family ")).resolves.toMatchObject({
       ok: true,
-      value: { accountName: "Butcher Family" },
+      value: { accountName: "Example Family" },
     });
     await expect(handlers.listVaults()).resolves.toEqual({ ok: true, value: [{ id: VAULT, title: "PaperRouteTest" }] });
-    expect(connect).toHaveBeenCalledWith(expect.objectContaining({ accountName: "Butcher Family" }));
+    expect(connect).toHaveBeenCalledWith(expect.objectContaining({ accountName: "Example Family" }));
   });
 
   it("reuses one session across calls (one approval prompt per process)", async () => {
     const { handlers, connect } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     await handlers.listVaults();
     await handlers.save({ filePath: file, vaultId: VAULT });
     expect(connect).toHaveBeenCalledTimes(1);
@@ -121,7 +132,7 @@ describe("handlers", () => {
 
   it("saves with the paper-route tag and remembers the vault", async () => {
     const { handlers, client, settings } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
 
     const result = await handlers.save({ filePath: file, vaultId: VAULT, title: "Dentist" });
 
@@ -132,7 +143,7 @@ describe("handlers", () => {
 
   it("defaults the title to the file name when the title is blank", async () => {
     const { handlers } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     await expect(handlers.save({ filePath: file, vaultId: VAULT, title: "  " })).resolves.toMatchObject({
       ok: true,
       value: { title: "receipt.pdf" },
@@ -141,7 +152,7 @@ describe("handlers", () => {
 
   it("returns core errors with their code and details, and doesn't remember the vault on failure", async () => {
     const { handlers, client, settings } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     client.seed({ id: "existing", title: "receipt.pdf", vaultId: VAULT, category: "Document" as never });
 
     await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toEqual({
@@ -158,7 +169,7 @@ describe("handlers", () => {
 
   it("reports a save as successful even if remembering the vault fails", async () => {
     const { handlers, client, settings } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     // Block the settings file so the next write fails.
     const { mkdir } = await import("node:fs/promises");
     await rm(settingsFile);
@@ -175,7 +186,7 @@ describe("handlers", () => {
 
   it("validates save arguments from the window before doing anything", async () => {
     const { handlers, connect } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     const bad: unknown[] = [
       null,
       "receipt.pdf",
@@ -196,9 +207,156 @@ describe("handlers", () => {
 
   it("writes the settings file privately", async () => {
     const { handlers } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     const { mode } = await import("node:fs/promises").then((fs) => fs.stat(settingsFile));
     expect(mode & 0o777).toBe(0o600);
-    expect(JSON.parse(await readFile(settingsFile, "utf8"))).toEqual({ accountName: "Butcher Family", lastVaultId: null });
+    expect(JSON.parse(await readFile(settingsFile, "utf8"))).toEqual({
+      accountName: "Example Family",
+      lastVaultId: null,
+      trashAfterSave: false,
+    });
+  });
+});
+
+describe("move to Trash after saving", () => {
+  async function withTrashOn(client?: FakeClient) {
+    const s = setup(client);
+    await s.handlers.setAccount("Example Family");
+    await s.handlers.setTrashAfterSave(true);
+    return s;
+  }
+
+  it("is off by default: the original stays and Trash is never touched", async () => {
+    const { handlers, trash } = setup();
+    await handlers.setAccount("Example Family");
+
+    await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: true,
+      value: { original: "kept" },
+    });
+    expect(trash).not.toHaveBeenCalled();
+    expect(existsSync(file)).toBe(true);
+  });
+
+  it("moves the original to the Trash once the document is stored and verified", async () => {
+    const { handlers, trash, client } = await withTrashOn();
+
+    await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: true,
+      value: { original: "trashed" },
+    });
+    expect(trash).toHaveBeenCalledWith(file);
+    expect(existsSync(file)).toBe(false);
+    expect(client.stored.size).toBe(1);
+  });
+
+  it("remembers the option, accepts only true or false, and treats anything else on disk as off", async () => {
+    const { handlers } = setup();
+    await expect(handlers.setTrashAfterSave(true)).resolves.toMatchObject({ ok: true, value: { trashAfterSave: true } });
+    await expect(new SettingsStore(settingsFile).get()).resolves.toMatchObject({ trashAfterSave: true });
+
+    for (const bad of ["yes", 1, null, undefined]) {
+      await expect(handlers.setTrashAfterSave(bad)).resolves.toMatchObject({ ok: false, error: { code: "INVALID_REQUEST" } });
+    }
+
+    await writeFile(settingsFile, JSON.stringify({ trashAfterSave: "yes" }));
+    await expect(new SettingsStore(settingsFile).get()).resolves.toMatchObject({ trashAfterSave: false });
+  });
+
+  it("leaves the original alone when the save fails", async () => {
+    const { handlers, trash, client } = await withTrashOn();
+    client.seed({ id: "existing", title: "receipt.pdf", vaultId: VAULT, category: "Document" as never });
+
+    await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: false,
+      error: { code: "DUPLICATE_TITLE" },
+    });
+    expect(trash).not.toHaveBeenCalled();
+    expect(existsSync(file)).toBe(true);
+  });
+
+  it("leaves the original alone when verification fails", async () => {
+    const { handlers, trash, client } = await withTrashOn();
+    client.corruptNextRead(new TextEncoder().encode("different"));
+
+    await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: false,
+      error: { code: "VERIFY_FAILED" },
+    });
+    expect(trash).not.toHaveBeenCalled();
+    expect(existsSync(file)).toBe(true);
+  });
+
+  it("keeps a file that changed during the save, since 1Password has the old version", async () => {
+    const client = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
+    const realCreate = client.items.create;
+    client.items.create = vi.fn(async (params: Parameters<typeof realCreate>[0]) => {
+      const item = await realCreate(params);
+      // The user (or a download finishing) writes a newer version mid-save.
+      await writeFile(file, "a newer, longer version of the pdf");
+      return item;
+    });
+    const { handlers, trash } = await withTrashOn(client);
+
+    await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: true,
+      value: { original: "changed" },
+    });
+    expect(trash).not.toHaveBeenCalled();
+    expect(await readFile(file, "utf8")).toBe("a newer, longer version of the pdf");
+  });
+
+  it("uses the Trash setting as it is when the save finishes, not when it started", async () => {
+    // The user unticks the box while the save waits (e.g. for approval).
+    const client = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
+    const realCreate = client.items.create;
+    let handlersRef: ReturnType<typeof setup>["handlers"] | null = null;
+    client.items.create = vi.fn(async (params: Parameters<typeof realCreate>[0]) => {
+      await handlersRef!.setTrashAfterSave(false);
+      return realCreate(params);
+    });
+    const unticked = await withTrashOn(client);
+    handlersRef = unticked.handlers;
+
+    await expect(unticked.handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: true,
+      value: { original: "kept" },
+    });
+    expect(unticked.trash).not.toHaveBeenCalled();
+    expect(existsSync(file)).toBe(true);
+  });
+
+  it("honours the box being ticked during a save, too", async () => {
+    const client = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
+    const realCreate = client.items.create;
+    let handlersRef: ReturnType<typeof setup>["handlers"] | null = null;
+    client.items.create = vi.fn(async (params: Parameters<typeof realCreate>[0]) => {
+      await handlersRef!.setTrashAfterSave(true);
+      return realCreate(params);
+    });
+    const ticked = setup(client);
+    handlersRef = ticked.handlers;
+    await ticked.handlers.setAccount("Example Family");
+
+    await expect(ticked.handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: true,
+      value: { original: "trashed" },
+    });
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it("still reports the save as successful when moving to the Trash fails", async () => {
+    const { handlers, trash, client } = await withTrashOn();
+    trash.mockRejectedValueOnce(new Error("Trash unavailable"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: true,
+      value: { original: "failed" },
+    });
+    expect(existsSync(file)).toBe(true);
+    expect(client.stored.size).toBe(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("couldn't move the original to the Trash"));
+    warn.mockRestore();
   });
 });

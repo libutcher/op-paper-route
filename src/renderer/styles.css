@@ -54,8 +54,14 @@ body {
   height: 100%;
 }
 
-.view[hidden] {
-  display: none;
+/*
+ * The script shows and hides parts of the page with the `hidden` attribute.
+ * The browser's own rule for it is weaker than any `display` set here (for
+ * example `.drop > div { display: flex }`), which left hidden parts on screen.
+ * This makes `hidden` always win.
+ */
+[hidden] {
+  display: none !important;
 }
 
 h1 {
@@ -130,6 +136,18 @@ button:focus-visible,
   color: var(--muted);
 }
 
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: normal;
+}
+
+label.check input {
+  width: auto;
+  margin: 0;
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -137,9 +155,6 @@ button:focus-visible,
   margin-top: 12px;
 }
 
-.actions[hidden] {
-  display: none;
-}
 
 .keys {
   font-size: 11px;
@@ -161,6 +176,9 @@ button.primary {
   background: var(--accent);
   color: var(--accent-fg);
   font-weight: 600;
+  /* Keep the label on one line; the hint beside it wraps instead. */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 button.secondary {
