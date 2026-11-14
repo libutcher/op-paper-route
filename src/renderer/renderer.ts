@@ -19,8 +19,10 @@ const api = window.paperRoute;
 /** Errors where the same request may succeed if sent again. */
 const RETRYABLE: ReadonlySet<ErrorCode> = new Set(["NOT_AUTHORIZED", "SESSION_EXPIRED", "RATE_LIMITED", "APP_NOT_FOUND", "UNKNOWN"]);
 
-/** After this long without an answer, 1Password is probably showing its prompt. */
+/** After this long without an answer, say something so the window doesn't look frozen. */
 const PROMPT_HINT_AFTER_MS = 1500;
+/** 1Password ends an approval after ten minutes without use. */
+const APPROVAL_IDLE_MS = 10 * 60 * 1000;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -73,17 +75,44 @@ async function withPromptHint<T>(working: string, call: () => Promise<Result<T>>
   busy = true;
   updateSaveButton();
   setStatus(working, "info");
+  // Only tell the user to approve something when a prompt is likely. With a
+  // recent approval a slow call is usually just slow (a big upload), though
+  // 1Password can still prompt if it was locked meanwhile, so say that softly.
   const hint = setTimeout(
-    () => setStatus("Waiting for 1Password — approve the request in the 1Password app.", "waiting"),
+    () =>
+      promptLikely()
+        ? setStatus("Waiting for 1Password — approve the request in the 1Password app.", "waiting")
+        : setStatus(`${working} Still working. If 1Password asks for approval, approve it there.`, "info"),
     PROMPT_HINT_AFTER_MS,
   );
   try {
-    return await call();
+    const result = await call();
+    noteOutcome(result);
+    return result;
   } finally {
     clearTimeout(hint);
     busy = false;
     updateSaveButton();
   }
+}
+
+/** When 1Password last answered a request from this window, or null if it hasn't (or its approval has ended). */
+let lastAnsweredAt: number | null = null;
+
+/** Errors that mean the approval is missing or gone, so the next call will prompt. */
+const APPROVAL_LOST: ReadonlySet<ErrorCode> = new Set(["NOT_AUTHORIZED", "SESSION_EXPIRED", "ACCOUNT_NOT_FOUND", "APP_NOT_FOUND"]);
+/** Errors raised before 1Password is contacted; they say nothing about approval. */
+const LOCAL_ONLY: ReadonlySet<ErrorCode> = new Set(["INVALID_REQUEST", "FILE_UNREADABLE", "FILE_TOO_LARGE"]);
+
+function noteOutcome(result: Result<unknown>): void {
+  if (result.ok) lastAnsweredAt = Date.now();
+  else if (APPROVAL_LOST.has(result.error.code)) lastAnsweredAt = null;
+  else if (!LOCAL_ONLY.has(result.error.code)) lastAnsweredAt = Date.now();
+}
+
+/** True when the next call will probably show 1Password's approval prompt. */
+function promptLikely(): boolean {
+  return lastAnsweredAt === null || Date.now() - lastAnsweredAt > APPROVAL_IDLE_MS;
 }
 
 function describeError(error: ApiError): string {
