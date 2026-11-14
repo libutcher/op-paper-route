@@ -61,7 +61,25 @@
         <span class="hint keys">Return to save · Esc to hide · ⌃⌥P to reopen</span>
       </div>
 
-      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <div id="status" class="status" role="status" aria-live="polite">
+        <!-- One icon per state; CSS shows the one matching the status's tone. -->
+        <span class="status-icon" aria-hidden="true">
+          <svg class="i-dots" viewBox="0 0 24 24">
+            <circle class="d1" cx="5" cy="12" r="2.1" />
+            <circle class="d2" cx="12" cy="12" r="2.1" />
+            <circle class="d3" cx="19" cy="12" r="2.1" />
+          </svg>
+          <svg class="i-check" viewBox="0 0 24 24">
+            <path d="M5 12.5 L10 17.5 L19 7" />
+          </svg>
+          <svg class="i-error" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7.5 V13" />
+            <circle class="i-error-dot" cx="12" cy="16.6" r="0.6" />
+          </svg>
+        </span>
+        <span id="status-text"></span>
+      </div>
       <div id="status-actions" class="actions" hidden></div>
     </form>
   </body>

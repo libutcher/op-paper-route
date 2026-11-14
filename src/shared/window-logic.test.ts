@@ -109,7 +109,7 @@ describe("slowCallMessage", () => {
       text: "Waiting for 1Password — approve the request in the 1Password app.",
       tone: "waiting",
     });
-    expect(slowCallMessage("Saving…", false)).toMatchObject({ tone: "info", text: expect.stringContaining("Saving… Still working") });
+    expect(slowCallMessage("Saving…", false)).toMatchObject({ tone: "working", text: expect.stringContaining("Saving… Still working") });
   });
 });
 

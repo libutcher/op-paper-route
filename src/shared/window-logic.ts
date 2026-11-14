@@ -111,11 +111,11 @@ export class ApprovalTracker {
 }
 
 /** What to show when a call is taking a while. */
-export function slowCallMessage(working: string, promptLikely: boolean): { text: string; tone: "waiting" | "info" } {
+export function slowCallMessage(working: string, promptLikely: boolean): { text: string; tone: "waiting" | "working" } {
   return promptLikely
     ? { text: "Waiting for 1Password — approve the request in the 1Password app.", tone: "waiting" }
     : // 1Password can still prompt if it was locked meanwhile, so mention it softly.
-      { text: `${working} Still working. If 1Password asks for approval, approve it there.`, tone: "info" };
+      { text: `${working} Still working. If 1Password asks for approval, approve it there.`, tone: "working" };
 }
 
 /** The last path component, for display and as the default title. */

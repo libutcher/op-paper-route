@@ -66,7 +66,9 @@ let preferredVaultId: string | null = null;
 
 // ---------- status line ----------
 
-type Tone = "info" | "ok" | "waiting" | "error";
+/** "working" is a call in progress; it and "waiting", "ok" and "error" each have an animated icon. */
+type Tone = "info" | "working" | "ok" | "waiting" | "error";
+const statusText = $<HTMLSpanElement>("status-text");
 
 /**
  * Whether the window is on screen, as far as this page knows: false until
@@ -88,8 +90,13 @@ let statusUnseen = false;
 
 function setStatus(text: string, tone: Tone = "info", actions: Array<{ label: string; run: () => void }> = []): void {
   statusUnseen = !onScreen && text !== "";
-  statusEl.textContent = text;
-  statusEl.className = `status ${tone === "info" ? "" : tone}`;
+  statusText.textContent = text;
+  // Remove the tone, force a reflow, then set it: this restarts the icon's
+  // animation (e.g. the error shake) even when the tone hasn't changed.
+  statusEl.className = "status";
+  void statusEl.offsetWidth;
+  // An empty status shows no icon, whatever the tone.
+  statusEl.className = text && tone !== "info" ? `status ${tone}` : "status";
   statusActions.replaceChildren(
     ...actions.map(({ label, run }) => {
       const button = document.createElement("button");
@@ -110,7 +117,7 @@ function setStatus(text: string, tone: Tone = "info", actions: Array<{ label: st
 async function withPromptHint<T>(working: string, call: () => Promise<Result<T>>): Promise<Result<T>> {
   busy = true;
   updateSaveButton();
-  setStatus(working, "info");
+  setStatus(working, "working");
   const hint = setTimeout(() => {
     const { text, tone } = slowCallMessage(working, approval.promptLikely());
     setStatus(text, tone);
