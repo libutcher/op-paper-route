@@ -1,10 +1,10 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sdk from "@1password/sdk";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fakeClient, type FakeClient } from "./fake-client.test-util.js";
-import { ALWAYS_FITS_BYTES } from "./limits.js";
+import { ALWAYS_FITS_BYTES, NEVER_FITS_BYTES } from "./limits.js";
 import { saveDocument } from "./save.js";
 import { Session } from "./session.js";
 
@@ -121,6 +121,41 @@ describe("saveDocument", () => {
     expect(details.encoded).toBeGreaterThan(details.limit);
     expect(session.isConnected).toBe(false);
     expect(client.items.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file that can never fit from its size alone, even past Node's 2 GiB read limit", async () => {
+    const { session, client } = setup();
+    // Sparse file: 3 GiB on paper, no disk space used. readFile would throw
+    // ERR_FS_FILE_TOO_LARGE, which used to surface as FILE_UNREADABLE.
+    const giant = join(dir, "giant.iso");
+    await truncate(giant, 3 * 1024 ** 3).catch(async () => {
+      await writeFile(giant, "");
+      await truncate(giant, 3 * 1024 ** 3);
+    });
+
+    const started = performance.now();
+    const err = await saveDocument(session, { filePath: giant, vaultId: VAULT }).catch((e: unknown) => e);
+
+    expect(err).toMatchObject({
+      code: "FILE_TOO_LARGE",
+      details: { fileName: "giant.iso", bytes: 3 * 1024 ** 3, maxFileBytes: NEVER_FITS_BYTES - 1 },
+    });
+    expect((err as { details: object }).details).not.toHaveProperty("encoded");
+    // Rejected without reading 3 GiB into memory.
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(session.isConnected).toBe(false);
+    expect(client.items.create).not.toHaveBeenCalled();
+  });
+
+  it("still reads and checks exactly when the size alone can't decide", async () => {
+    const { session } = setup();
+    // In the "unknown" band, all zeros: small enough encoded to fit.
+    const borderline = join(dir, "borderline.bin");
+    await writeFile(borderline, new Uint8Array(ALWAYS_FITS_BYTES + 1));
+
+    await expect(saveDocument(session, { filePath: borderline, vaultId: VAULT })).resolves.toMatchObject({
+      bytes: ALWAYS_FITS_BYTES + 1,
+    });
   });
 
   it("refuses a duplicate Document title by default and names the existing item", async () => {

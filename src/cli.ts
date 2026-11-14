@@ -29,7 +29,9 @@ function describe(err: PaperRouteError): string {
   const d = err.details;
   switch (err.code) {
     case "FILE_TOO_LARGE":
-      return `${err.message} (${mb(Number(d.bytes))} encodes to ${mb(Number(d.encoded))}; the limit is ${mb(Number(d.limit))})`;
+      return "encoded" in d
+        ? `${err.message} (${mb(Number(d.bytes))} encodes to ${mb(Number(d.encoded))}; the limit is ${mb(Number(d.limit))})`
+        : `${err.message} (${mb(Number(d.bytes))}; no file over ${mb(Number(d.maxFileBytes))} can fit)`;
     case "DUPLICATE_TITLE":
       return `${err.message} (item ${String(d.itemId)}); pass --allow-duplicate or --title to save anyway`;
     case "VAULT_AMBIGUOUS":

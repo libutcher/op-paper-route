@@ -8,12 +8,12 @@
  * leaves nothing behind.
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import sdk from "@1password/sdk";
 import type { ItemCreateParams } from "@1password/sdk";
 import { PaperRouteError, fromSdkError, messageFor } from "./errors.js";
-import { checkFits } from "./limits.js";
+import { MAX_ENCODED_BYTES, NEVER_FITS_BYTES, checkFits, sizeHint } from "./limits.js";
 import type { Session } from "./session.js";
 
 export interface SaveRequest {
@@ -43,18 +43,40 @@ export async function saveDocument(session: Session, request: SaveRequest): Prom
   const fileName = basename(request.filePath);
   const title = request.title?.trim() || fileName;
 
-  // 1. Read into memory. No temp copies; the path itself is never stored in the item.
+  const unreadable = (err: unknown) =>
+    new PaperRouteError("FILE_UNREADABLE", `${messageFor("FILE_UNREADABLE")}: ${fileName}`, {
+      cause: err,
+      details: { fileName },
+    });
+  const tooLargeBySize = (bytes: number, cause?: unknown) =>
+    new PaperRouteError("FILE_TOO_LARGE", `${messageFor("FILE_TOO_LARGE")}: ${fileName}`, {
+      cause,
+      details: { fileName, bytes, limit: MAX_ENCODED_BYTES, maxFileBytes: NEVER_FITS_BYTES - 1 },
+    });
+
+  // 1. A file that can't fit whatever its contents is rejected from its size
+  //    alone, without reading it into memory.
+  let size: number;
+  try {
+    size = (await stat(request.filePath)).size;
+  } catch (err) {
+    throw unreadable(err);
+  }
+  if (sizeHint(size) === "too-large") throw tooLargeBySize(size);
+
+  // 2. Read into memory. No temp copies; the path itself is never stored in the item.
+  //    The exact check below still runs on what was read, in case the file
+  //    changed after the stat.
   let content: Uint8Array;
   try {
     content = new Uint8Array(await readFile(request.filePath));
   } catch (err) {
-    throw new PaperRouteError("FILE_UNREADABLE", `${messageFor("FILE_UNREADABLE")}: ${fileName}`, {
-      cause: err,
-      details: { fileName },
-    });
+    // Node refuses to read files over 2 GiB; that's a size problem, not an unreadable file.
+    if ((err as NodeJS.ErrnoException).code === "ERR_FS_FILE_TOO_LARGE") throw tooLargeBySize(size, err);
+    throw unreadable(err);
   }
 
-  // 2. Will it fit in one SDK message? Decided before any prompt.
+  // 3. Will these exact bytes fit in one SDK message? Decided before any prompt.
   const fit = checkFits(content);
   if (!fit.fits) {
     throw new PaperRouteError("FILE_TOO_LARGE", `${messageFor("FILE_TOO_LARGE")}: ${fileName}`, {
