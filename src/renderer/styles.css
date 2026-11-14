@@ -169,6 +169,33 @@ button:focus-visible,
   color: var(--muted);
 }
 
+/* ---------- first-run account screen ---------- */
+
+.lead {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.steps {
+  margin: 2px 0 6px;
+  padding-left: 20px;
+  color: var(--muted);
+}
+
+.steps li + li {
+  margin-top: 2px;
+}
+
+#account-view .hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+#account-view .status {
+  margin-top: 4px;
+}
+
 label.check {
   display: flex;
   align-items: center;

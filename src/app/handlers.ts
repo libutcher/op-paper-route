@@ -7,6 +7,7 @@ import { stat } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { PaperRouteError, Session, listVaults, saveDocument, type Connect } from "../core/index.js";
 import type { ApiError, AppState, OriginalFile, Result, SaveArgs, SaveOutcome, VaultSummary } from "../shared/api.js";
+import { accountNameCandidates, tidySpaces } from "./account-names.js";
 import type { SettingsStore } from "./settings.js";
 
 export interface HandlerOptions {
@@ -89,8 +90,32 @@ export function createHandlers(options: HandlerOptions): Handlers {
 
     async setAccount(accountName) {
       // Everything from the window is untrusted input at this boundary.
-      if (typeof accountName !== "string" || !accountName.trim()) return invalid("Account name can't be empty");
-      return attempt(() => settings.update({ accountName: accountName.trim() }));
+      if (typeof accountName !== "string") return invalid("Account name can't be empty");
+      const candidates = accountNameCandidates(accountName);
+      if (candidates.length === 0) return invalid("Account name can't be empty");
+
+      // Check the name works before saving it, so a typo is caught here rather
+      // than after the user has moved on. Connecting is the only way to check:
+      // a name 1Password doesn't know fails at once, with no prompt, so the
+      // near-identical spellings cost nothing. The session that connects is
+      // kept, so the user approves once, not again when vaults load.
+      return attempt(async () => {
+        for (const candidate of candidates) {
+          try {
+            await listVaults(sessionFor(candidate));
+          } catch (err) {
+            if (err instanceof PaperRouteError && err.code === "ACCOUNT_NOT_FOUND") continue;
+            throw err; // Declined, 1Password not running, …: stop and say so.
+          }
+          return settings.update({ accountName: candidate });
+        }
+        const typed = tidySpaces(accountName);
+        throw new PaperRouteError(
+          "ACCOUNT_NOT_FOUND",
+          `No 1Password account called “${typed}” is signed in. The name must match exactly, including capital letters.`,
+          { details: { typed } },
+        );
+      });
     },
 
     async setTrashAfterSave(on) {

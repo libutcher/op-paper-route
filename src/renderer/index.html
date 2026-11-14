@@ -23,11 +23,17 @@
 
     <!-- First run: which 1Password account to use. -->
     <form id="account-view" class="view" hidden>
-      <p class="hint">Which 1Password account should documents go to? Use the name shown at the top of the 1Password sidebar.</p>
+      <p class="lead">Which 1Password account should your documents go to?</p>
+      <ol class="steps">
+        <li>Open the 1Password app.</li>
+        <li>Find your account's name at the very top of the sidebar, above your vaults.</li>
+        <li>Type it below exactly as shown.</li>
+      </ol>
       <label for="account-name">Account name</label>
-      <input id="account-name" type="text" autocomplete="off" required />
-      <button type="submit" class="primary">Continue</button>
-      <p id="account-error" class="status error" role="alert"></p>
+      <input id="account-name" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. Personal, or your family's name" required />
+      <button type="submit" id="account-continue" class="primary">Continue</button>
+      <p class="hint">PaperRoute checks the name with 1Password straight away, so 1Password may ask you to approve. You only do this once.</p>
+      <p id="account-status" class="status" role="status" aria-live="polite"></p>
     </form>
 
     <!-- Everyday view: drop, check, Return. -->
