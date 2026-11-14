@@ -45,6 +45,31 @@ export async function firstFile(candidates: readonly string[], cwd: string): Pro
 }
 
 /**
+ * Collects paths that arrive one at a time but belong together, and hands
+ * them over as one batch once `delayMs` passes without another.
+ *
+ * macOS delivers "open these files" (from Finder, the Dock, or the Quick
+ * Action via `open -b`) as one open-file event per file. Taken one by one,
+ * each would replace the last, so a three-file selection would quietly end up
+ * as its last file. Batched, the first file is used and the others counted,
+ * as for every other way in.
+ */
+export function batchPaths(delayMs: number, flush: (paths: string[]) => void): (path: string) => void {
+  let pending: string[] = [];
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return (path) => {
+    pending.push(path);
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      const batch = pending;
+      pending = [];
+      timer = null;
+      flush(batch);
+    }, delayMs);
+  };
+}
+
+/**
  * Holds a handed-off file until the window can take it.
  *
  * A file can arrive before the page has loaded (a Quick Action that starts

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { Inbox, firstFile, pathArguments } from "./handoff.js";
+import { Inbox, batchPaths, firstFile, pathArguments } from "./handoff.js";
 
 describe("pathArguments", () => {
   it("skips the executable and, when unpackaged, the app folder", () => {
@@ -71,6 +71,43 @@ describe("firstFile", () => {
   it("returns null when nothing usable was passed", async () => {
     await expect(firstFile([], dir)).resolves.toBeNull();
     await expect(firstFile([join(dir, "folder")], dir)).resolves.toBeNull();
+  });
+});
+
+describe("batchPaths", () => {
+  it("hands over paths that arrive together as one batch, in order", () => {
+    vi.useFakeTimers();
+    try {
+      const flush = vi.fn();
+      const add = batchPaths(150, flush);
+      add("/a.pdf");
+      vi.advanceTimersByTime(100);
+      add("/b.pdf");
+      vi.advanceTimersByTime(100);
+      add("/c.pdf");
+      expect(flush).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(150);
+      expect(flush).toHaveBeenCalledTimes(1);
+      expect(flush).toHaveBeenCalledWith(["/a.pdf", "/b.pdf", "/c.pdf"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("starts a fresh batch afterwards", () => {
+    vi.useFakeTimers();
+    try {
+      const flush = vi.fn();
+      const add = batchPaths(150, flush);
+      add("/first.pdf");
+      vi.advanceTimersByTime(200);
+      add("/second.pdf");
+      vi.advanceTimersByTime(200);
+      expect(flush.mock.calls).toEqual([[["/first.pdf"]], [["/second.pdf"]]]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

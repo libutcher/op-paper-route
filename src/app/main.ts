@@ -12,7 +12,15 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHANNELS } from "../shared/api.js";
-import { Inbox, firstFile, pathArguments } from "./handoff.js";
+import { Inbox, batchPaths, firstFile, pathArguments } from "./handoff.js";
+import {
+  ENABLE_HINT,
+  MENU_TITLE as QUICK_ACTION_TITLE,
+  installQuickAction,
+  packagedLauncherScript,
+  quickActionState,
+  uninstallQuickAction,
+} from "./quick-action.js";
 import { createHandlers } from "./handlers.js";
 import { isOurPage } from "./sender.js";
 import { SettingsStore } from "./settings.js";
@@ -57,9 +65,12 @@ if (isDefaultApp && devUserData) app.setPath("userData", devUserData);
 // macOS "open with" (a file dropped on the app icon, or opened with it from
 // Finder) only fires for a packaged app; wired now so M4 needs no app changes.
 // It can arrive before the app is ready, so it's registered first.
+// macOS sends one open-file event per file, so a multi-file "open" (Finder,
+// the Dock, or the Quick Action's `open -b`) is gathered into one batch first.
+const openFileBatch = batchPaths(150, (paths) => void receive(paths, "/"));
 app.on("open-file", (event, path) => {
   event.preventDefault();
-  void receive([path], "/");
+  openFileBatch(path);
 });
 
 // Two copies would each need their own 1Password approval. Hand off to the
@@ -210,15 +221,49 @@ function createTray(): void {
   if (icon.isEmpty()) tray.setTitle("PaperRoute");
   tray.setToolTip(`PaperRoute — press ${HOTKEY_WORDS}, or drop a file here`);
   tray.on("drop-files", (_event, files) => void receive(files, "/"));
-  tray.setContextMenu(
+  refreshTrayMenu();
+}
+
+function refreshTrayMenu(): void {
+  tray?.setContextMenu(
     Menu.buildFromTemplate([
       // Show the shortcut in the menu, but don't register it a second time:
       // the global shortcut already owns it.
       { label: "Save a Document…", accelerator: HOTKEY, registerAccelerator: false, click: showWindow },
       { type: "separator" },
+      // Only a packaged app can install a Quick Action that finds it by bundle
+      // id; a development copy uses `npm run install-quick-action` instead.
+      ...(app.isPackaged ? [quickActionMenuItem(), { type: "separator" as const }] : []),
       { label: "Quit PaperRoute", role: "quit" },
     ]),
   );
+}
+
+function quickActionMenuItem(): Electron.MenuItemConstructorOptions {
+  if (quickActionState() === "ours") {
+    return {
+      label: "Remove Finder Quick Action",
+      click: () =>
+        void uninstallQuickAction()
+          .catch((err: unknown) => dialog.showErrorBox("Couldn't remove the Quick Action", String(err)))
+          .finally(refreshTrayMenu),
+    };
+  }
+  // Not installed, or one from a development copy: (re)install this app's.
+  return {
+    label: "Install Finder Quick Action…",
+    click: () =>
+      void installQuickAction(packagedLauncherScript())
+        .then(() =>
+          dialog.showMessageBox({
+            type: "info",
+            message: `“${QUICK_ACTION_TITLE}” is installed`,
+            detail: `In Finder, right-click a file and choose Quick Actions → ${QUICK_ACTION_TITLE}.\n\n${ENABLE_HINT}`,
+          }),
+        )
+        .catch((err: unknown) => dialog.showErrorBox("Couldn't install the Quick Action", String(err)))
+        .finally(refreshTrayMenu),
+  };
 }
 
 /** False until the page has drawn for the first time (or given up trying). */
