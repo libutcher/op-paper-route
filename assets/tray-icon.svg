@@ -1,0 +1,8 @@
+<!--
+  PaperRoute menu-bar icon: a paper plane silhouette.
+  Drawn in black only; macOS uses it as a template image and recolours it for
+  light and dark menu bars. Rendered to PNG by scripts/render-icons.mjs.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M21.5 3.5 L3 10.6 L9.6 13.2 L12.6 20.2 Z" fill="#000"/>
+</svg>

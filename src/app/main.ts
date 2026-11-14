@@ -132,7 +132,7 @@ async function start(): Promise<void> {
 function createWindow(): void {
   win = new BrowserWindow({
     width: 440,
-    height: 450,
+    height: 480,
     show: false,
     resizable: false,
     minimizable: false,
@@ -195,8 +195,13 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  tray = new Tray(nativeImage.createEmpty());
-  tray.setTitle("📄");
+  // A template image: macOS recolours it for light and dark menu bars, and
+  // picks trayTemplate@2x.png on Retina displays.
+  const icon = nativeImage.createFromPath(join(here, "../../assets/trayTemplate.png"));
+  icon.setTemplateImage(true);
+  tray = new Tray(icon);
+  // Fall back to text if the icon couldn't be loaded, so the app is never unreachable.
+  if (icon.isEmpty()) tray.setTitle("PaperRoute");
   tray.setToolTip(`PaperRoute — press ${HOTKEY_WORDS}, or drop a file here`);
   tray.on("drop-files", (_event, files) => void receive(files, "/"));
   tray.setContextMenu(

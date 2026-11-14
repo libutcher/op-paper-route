@@ -12,9 +12,16 @@
     <script type="module" src="renderer.js"></script>
   </head>
   <body>
+    <header class="brand">
+      <!-- The PaperRoute mark: a paper plane silhouette (same shape as the menu-bar icon). -->
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M21.5 3.5 L3 10.6 L9.6 13.2 L12.6 20.2 Z" />
+      </svg>
+      <span class="wordmark">PaperRoute</span>
+    </header>
+
     <!-- First run: which 1Password account to use. -->
     <form id="account-view" class="view" hidden>
-      <h1>PaperRoute</h1>
       <p class="hint">Which 1Password account should documents go to? Use the name shown at the top of the 1Password sidebar.</p>
       <label for="account-name">Account name</label>
       <input id="account-name" type="text" autocomplete="off" required />
