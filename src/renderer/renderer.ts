@@ -67,7 +67,26 @@ let preferredVaultId: string | null = null;
 
 type Tone = "info" | "ok" | "waiting" | "error";
 
+/**
+ * Whether the window is on screen, as far as this page knows: false until
+ * the main process says it has been shown, and false again once hidden.
+ * (A window that has never been shown still reports itself "visible", so
+ * document.visibilityState alone can't tell.)
+ */
+let onScreen = false;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") onScreen = false;
+});
+
+/**
+ * True when the current status was set while the window was off screen,
+ * e.g. the "one file at a time" note for a Quick Action that started the app.
+ * The user hasn't seen it yet, so showing the window must not clear it.
+ */
+let statusUnseen = false;
+
 function setStatus(text: string, tone: Tone = "info", actions: Array<{ label: string; run: () => void }> = []): void {
+  statusUnseen = !onScreen && text !== "";
   statusEl.textContent = text;
   statusEl.className = `status ${tone === "info" ? "" : tone}`;
   statusActions.replaceChildren(
@@ -343,11 +362,15 @@ document.addEventListener("keydown", (event) => {
 });
 
 api.onShown(() => {
+  const unseen = statusUnseen;
+  onScreen = true;
+  statusUnseen = false;
   if (saveView.hidden) return;
   (filePath ? titleInput : drop).focus();
   if (busy) return;
   // Start clean: no stale result or prompt from before the window was hidden.
-  setStatus(vaultsLoaded && !filePath ? "Ready." : "");
+  // A message set while the window was off screen is new, not stale: keep it.
+  if (!unseen) setStatus(vaultsLoaded && !filePath ? "Ready." : "");
   // If the vaults never loaded (the approval was denied, say), reopening the
   // window is a natural moment to try again.
   if (!vaultsLoaded) void loadVaults(preferredVaultId);
