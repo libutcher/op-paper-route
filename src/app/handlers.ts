@@ -29,7 +29,7 @@ export interface Handlers {
    * caller restarts the app afterwards: 1Password's approval is per process
    * and can't be revoked from inside it, so ending the process is what ends it.
    */
-  signOut(): Promise<void>;
+  forgetAccount(): Promise<void>;
   listVaults(): Promise<Result<VaultSummary[]>>;
   save(args: unknown): Promise<Result<SaveOutcome>>;
 }
@@ -124,7 +124,7 @@ export function createHandlers(options: HandlerOptions): Handlers {
       });
     },
 
-    async signOut() {
+    async forgetAccount() {
       session = null;
       sessionAccount = null;
       await settings.update({ accountName: null, lastVaultId: null });

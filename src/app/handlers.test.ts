@@ -439,7 +439,7 @@ describe("move to Trash after saving", () => {
   });
 });
 
-describe("signOut", () => {
+describe("forgetAccount (Choose Account…)", () => {
   it("forgets the account and last vault, keeps the Trash option, and needs a fresh account afterwards", async () => {
     const { handlers, settings, connect } = setup();
     await handlers.setAccount("Example Family");
@@ -448,7 +448,7 @@ describe("signOut", () => {
     await expect(settings.get()).resolves.toMatchObject({ accountName: "Example Family", lastVaultId: VAULT });
     const before = connect.mock.calls.length;
 
-    await handlers.signOut();
+    await handlers.forgetAccount();
 
     await expect(settings.get()).resolves.toEqual({ accountName: null, lastVaultId: null, trashAfterSave: true });
     await expect(handlers.listVaults()).resolves.toMatchObject({ ok: false, error: { code: "ACCOUNT_NOT_FOUND" } });
@@ -462,7 +462,7 @@ describe("signOut", () => {
 
   it("is harmless when no account was ever set", async () => {
     const { handlers, settings } = setup();
-    await expect(handlers.signOut()).resolves.toBeUndefined();
+    await expect(handlers.forgetAccount()).resolves.toBeUndefined();
     await expect(settings.get()).resolves.toMatchObject({ accountName: null });
   });
 });

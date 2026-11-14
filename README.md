@@ -38,7 +38,7 @@ PaperRoute asks which 1Password account your documents should go to. Open 1Passw
 
 Approve the request in 1Password. The approval is 1Password's to give and take away: it covers PaperRoute while it's running, and ends when 1Password locks or after ten minutes without use. After that, PaperRoute simply asks again next time.
 
-To switch accounts, or to leave nothing behind on a shared Mac, choose **Sign Out…** from the menu-bar icon. PaperRoute forgets the account and restarts, which is what ends 1Password's approval (it belongs to the running process, and nothing inside the app can revoke it). You'll see the first-run screen next time. Nothing in 1Password is changed.
+To switch to a different account, or to leave nothing behind on a shared Mac, choose **Choose Account…** from the menu-bar icon. PaperRoute forgets the current account and restarts onto the first-run screen, which is also what ends 1Password's approval (it belongs to the running process, and nothing inside the app can revoke it). Nothing in 1Password is changed.
 
 ### Saving a document
 

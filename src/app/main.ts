@@ -35,7 +35,7 @@ const HOTKEY_WORDS = "Control-Option-P";
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
-/** Set once start() has created the handlers; the menu needs them for Sign Out. */
+/** Set once start() has created the handlers; the menu needs them for Choose Account. */
 let appHandlers: ReturnType<typeof createHandlers> | null = null;
 
 // Files handed to the app from outside the window wait here until the window
@@ -233,7 +233,7 @@ function refreshTrayMenu(): void {
       // Show the shortcut in the menu, but don't register it a second time:
       // the global shortcut already owns it.
       { label: "Save a Document…", accelerator: HOTKEY, registerAccelerator: false, click: showWindow },
-      { label: "Sign Out…", click: () => void (appHandlers && signOut(appHandlers)) },
+      { label: "Choose Account…", click: () => void (appHandlers && chooseAccount(appHandlers)) },
       { type: "separator" },
       // Only a packaged app can install a Quick Action that finds it by bundle
       // id; a development copy uses `npm run install-quick-action` instead.
@@ -284,25 +284,30 @@ function markWindowReady(): void {
 }
 
 /**
- * Forget the account and restart. Restarting is the point: 1Password approves
- * the process, and nothing inside the process can revoke that, so a sign-out
- * that left the process running would leave the approval usable.
+ * Forget the current account and restart onto the first-run screen, where a
+ * different account can be entered. Restarting is the point: 1Password's
+ * approval belongs to the process, and nothing inside the process can revoke
+ * it, so forgetting the account without restarting would leave the old
+ * account's approval usable.
  */
-async function signOut(handlers: ReturnType<typeof createHandlers>): Promise<void> {
+async function chooseAccount(handlers: ReturnType<typeof createHandlers>): Promise<void> {
   const { accountName } = await handlers.getState();
-  if (!accountName) return;
+  if (!accountName) {
+    showWindow(); // already on the first-run screen
+    return;
+  }
   const { response } = await dialog.showMessageBox({
     type: "question",
-    buttons: ["Sign Out", "Cancel"],
+    buttons: ["Choose Account", "Cancel"],
     defaultId: 1,
     cancelId: 1,
-    message: `Sign out of “${accountName}”?`,
+    message: `Choose a different account than “${accountName}”?`,
     detail:
-      "PaperRoute will forget this account and restart, which ends 1Password's approval. " +
-      "Nothing in 1Password is changed. You'll be asked for an account name next time.",
+      "PaperRoute will forget this account and restart, then ask for an account name. " +
+      "1Password's approval for this account ends with the restart. Nothing in 1Password is changed.",
   });
   if (response !== 0) return;
-  await handlers.signOut();
+  await handlers.forgetAccount();
   app.relaunch();
   app.exit(0);
 }
