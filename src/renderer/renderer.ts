@@ -337,13 +337,17 @@ vaultSelect.addEventListener("change", () => {
 titleInput.addEventListener("input", clearStalePrompt);
 
 trashCheckbox.addEventListener("change", async () => {
-  const wanted = trashCheckbox.checked;
-  const result = await api.setTrashAfterSave(wanted);
-  if (!result.ok) {
-    // Show what's actually in effect, never what was merely clicked.
-    trashCheckbox.checked = !wanted;
-    setStatus(`Couldn't change the Trash option: ${result.error.message}`, "error");
+  const result = await api.setTrashAfterSave(trashCheckbox.checked);
+  if (result.ok) {
+    // Match what was stored. Settings updates are applied in the order they're
+    // sent, so after quick repeated clicks the last answer is the final state.
+    trashCheckbox.checked = result.value.trashAfterSave;
+    return;
   }
+  // Show what's actually in effect, never what was merely clicked or guessed:
+  // with overlapping clicks, "the opposite of this click" may be wrong.
+  trashCheckbox.checked = (await api.getState()).trashAfterSave;
+  setStatus(`Couldn't change the Trash option: ${result.error.message}`, "error");
 });
 
 /**
