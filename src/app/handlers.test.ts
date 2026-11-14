@@ -156,6 +156,23 @@ describe("handlers", () => {
     });
   });
 
+  it("reports a save as successful even if remembering the vault fails", async () => {
+    const { handlers, client, settings } = setup();
+    await handlers.setAccount("Butcher Family");
+    // Block the settings file so the next write fails.
+    const { mkdir } = await import("node:fs/promises");
+    await rm(settingsFile);
+    await mkdir(settingsFile);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({ ok: true });
+
+    expect(client.stored.size).toBe(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("couldn't remember the vault"));
+    await expect(settings.get()).resolves.toMatchObject({ lastVaultId: null });
+    warn.mockRestore();
+  });
+
   it("validates save arguments from the window before doing anything", async () => {
     const { handlers, connect } = setup();
     await handlers.setAccount("Butcher Family");

@@ -98,7 +98,12 @@ export function createHandlers(options: HandlerOptions): Handlers {
           tags: ["paper-route"],
           onDuplicate: allowDuplicate === true ? "allow" : "fail",
         });
-        await settings.update({ lastVaultId: vaultId });
+        // The document is in 1Password now. Failing to remember the vault is
+        // minor and must not be reported as a failed save: the user would
+        // retry, and the retry would make a second copy.
+        await settings.update({ lastVaultId: vaultId }).catch((err: unknown) => {
+          console.warn(`[paper-route] saved, but couldn't remember the vault: ${String(err)}`);
+        });
         return result;
       });
     },
