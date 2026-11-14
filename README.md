@@ -36,7 +36,7 @@ To build the disk image yourself, see [Development](#development).
 
 PaperRoute asks which 1Password account your documents should go to. Open 1Password and copy the name at the very top of the sidebar, above your vaults, then enter it and press Continue. PaperRoute checks the name with 1Password straight away and tells you if it doesn't match. It's forgiving about capitals and apostrophe style, but otherwise the name must match exactly: there's no way for an app to list your 1Password accounts for you.
 
-Approve the request in 1Password. Approval lasts until 1Password locks or ten minutes pass without use; after that, PaperRoute simply asks again next time.
+Approve the request in 1Password. The approval is 1Password's to give and take away: it ends when 1Password locks or after ten minutes without use. PaperRoute lets go of it sooner than that, as soon as you hide the window or leave it open and unused for three minutes, so an approval is never left sitting around. After that, PaperRoute simply asks again next time.
 
 ### Saving a document
 
@@ -50,6 +50,10 @@ If a document with the same title is already in the vault, PaperRoute asks befor
 
 Tick **Move the original to the Trash after saving** to clean up as you go. The file is moved only after the document has been read back from 1Password and matched byte for byte, and only if it hasn't changed since it was read. It goes to the Trash, not deleted, so it can be recovered. The setting is remembered.
 
+### Approving every save
+
+By default, one approval covers everything you do while the window is open, so saving three files in a row means one prompt. If you'd rather confirm each save in 1Password, tick **Ask 1Password to approve every save**. PaperRoute then lets go of the approval the moment a save finishes, and the next one asks again. The setting is remembered.
+
 ### If something doesn't work
 
 - **The Quick Action isn't in the right-click menu.** New Quick Actions can start switched off. Turn it on in **System Settings → General → Login Items & Extensions → Extensions → Finder** (click the ⓘ). It's also available under **Services** at the bottom of the right-click menu.
@@ -57,7 +61,7 @@ Tick **Move the original to the Trash after saving** to clean up as you go. The 
 - **"PaperRoute can't find the 1Password account … any more."** The account was renamed or signed out of 1Password. Check its name at the top of the 1Password sidebar and enter it again.
 - **Large files.** The 1Password SDK can't accept files over about 14 MB. PaperRoute says so before asking for approval.
 
-Settings (the account name, the last vault and the Trash option) are kept in `~/Library/Application Support/paper-route/settings.json`. Nothing secret is stored there.
+Settings (the account name, the last vault, the Trash option and the approve-every-save option) are kept in `~/Library/Application Support/paper-route/settings.json`. Nothing secret is stored there.
 
 ## Development
 
@@ -124,7 +128,7 @@ Signing with a Developer ID and notarising needs an Apple Developer membership. 
 Found while building this; none of it is in the SDK documentation.
 
 - **The real file limit is about 14 MB, not 50 MB.** The SDK caps each message at 50 MB, but it serializes file bytes as a JSON array of decimal numbers, so each byte of file costs 2–4 bytes of message. `src/core/limits.ts` computes the exact encoded size before asking for approval.
-- **Authorization is per process.** Each new process gets its own approval prompt, which is why the app keeps a single long-lived client rather than spawning one per save.
+- **Approval is per process, and belongs to 1Password.** 1Password approves a specific process for a specific account, for ten minutes of inactivity or until it locks, and revokes it itself; the app holds only a handle, never credentials. PaperRoute keeps one client for its lifetime so you aren't prompted on every save, and drops the handle when the window hides, after three minutes idle, or after each save if that option is on. Within an approval, the handle can reach any vault the user can (desktop auth can't be narrowed to one vault), which is why the packaged app's fuses, hardened runtime and sandboxed window matter.
 - **Locking 1Password doesn't raise the SDK's session-expired error.** The next call waits while 1Password prompts again (minutes, if nobody answers), then fails with a plain `invalid client id`. A denied prompt, and a locked app whose unlock is cancelled, both give `Denied authorization for SDK client`. `src/core/errors.ts` maps these exact messages; the UI shows that it's waiting for 1Password.
 - **The SDK accepts only the exact account name or the account ID**, case-sensitive, not an email. There's no call that lists accounts.
 - **Vault titles are not unique.** Always select and remember vaults by id.
