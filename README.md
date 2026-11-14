@@ -45,9 +45,9 @@ npm run install-quick-action     # builds the app, then installs it
 npm run uninstall-quick-action
 ```
 
-This adds **Save to 1Password with PaperRoute** to Finder: right-click a file → **Quick Actions** (or **Services**). PaperRoute opens with the file loaded; press Return to save. If PaperRoute is already running, the file goes to that copy, so there's no second approval. With several files selected, the first is used.
+This adds **Save to 1Password with PaperRoute** to Finder: right-click a file → **Quick Actions**. PaperRoute opens with the file loaded; press Return to save. If PaperRoute is already running, the file goes to that copy, so there's no second approval. With several files selected, the first is used.
 
-If it doesn't appear, turn it on in **System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders**. Until there's a packaged app, the Quick Action runs PaperRoute from this folder; if you move the folder, install it again.
+**A new Quick Action may start switched off.** If it isn't in the Quick Actions menu, turn it on in **System Settings → General → Login Items & Extensions → Extensions → Finder** (click the ⓘ). It's also available under **Services** at the bottom of the right-click menu. Until there's a packaged app, the Quick Action runs PaperRoute from this folder; if you move the folder, install it again.
 
 ## Using the CLI
 

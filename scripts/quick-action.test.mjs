@@ -55,6 +55,8 @@ describe.skipIf(!onMac)("writeWorkflow", () => {
     const read = (path, key) => execFileSync("plutil", ["-extract", key, "raw", "-o", "-", path]).toString().trim();
     expect(read(info, "NSServices.0.NSMenuItem.default")).toBe(MENU_TITLE);
     expect(read(info, "NSServices.0.NSRequiredContext.NSApplicationIdentifier")).toBe("com.apple.finder");
+    // Without an icon, Finder lists it under Services instead of Quick Actions.
+    expect(read(info, "NSServices.0.NSIconName")).toBe("NSActionTemplate");
     expect(read(doc, "actions.0.action.ActionParameters.inputMethod")).toBe("1");
     expect(read(doc, "workflowMetaData.serviceInputTypeIdentifier")).toBe("com.apple.Automator.fileSystemObject");
   });

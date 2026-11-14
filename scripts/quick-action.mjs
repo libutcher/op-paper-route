@@ -63,6 +63,11 @@ export function infoPlist() {
     CFBundleName: MENU_TITLE,
     NSServices: [
       {
+        // An icon is what makes Finder list this under Quick Actions in the
+        // right-click menu; without one it's a plain Service, under Services.
+        // These are the values Automator writes for a Quick Action.
+        NSIconName: "NSActionTemplate",
+        NSBackgroundColorName: "background",
         NSMenuItem: { default: MENU_TITLE },
         NSMessage: "runWorkflowAsService",
         NSRequiredContext: { NSApplicationIdentifier: "com.apple.finder" },
@@ -124,6 +129,10 @@ export function documentWflow(command) {
     ],
     connectors: {},
     workflowMetaData: {
+      // Quick Action presentation, as Automator writes it: the icon, and the
+      // places Finder may offer it.
+      systemImageName: "NSActionTemplate",
+      presentationMode: 15,
       serviceApplicationBundleID: "com.apple.finder",
       serviceApplicationPath: "/System/Library/CoreServices/Finder.app",
       serviceInputTypeIdentifier: "com.apple.Automator.fileSystemObject",
@@ -184,8 +193,9 @@ async function main(command) {
     await writeWorkflow(WORKFLOW_PATH, launcherScript(REPO));
     refreshServices();
     console.log(`Installed “${MENU_TITLE}”.`);
-    console.log("In Finder, right-click a file → Quick Actions (or Services) → " + MENU_TITLE + ".");
-    console.log("If it isn't listed: System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders, and tick it.");
+    console.log("In Finder, right-click a file → Quick Actions → " + MENU_TITLE + ".");
+    console.log("If it isn't listed, switch it on: System Settings → General → Login Items & Extensions → Extensions → Finder (ⓘ).");
+    console.log("It's also under Services, which can be switched on in Keyboard → Keyboard Shortcuts → Services → Files and Folders.");
   } else if (command === "uninstall") {
     const existed = existsSync(WORKFLOW_PATH);
     await removeWorkflow(WORKFLOW_PATH);
