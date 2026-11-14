@@ -55,7 +55,10 @@ const statusEl = $<HTMLDivElement>("status");
 const statusActions = $<HTMLDivElement>("status-actions");
 
 let filePath: string | null = null;
+/** A call to the main process is in flight (loading vaults or saving). */
 let busy = false;
+/** Specifically a save is in flight; new files wait until it's done. */
+let saving = false;
 let vaultsLoaded = false;
 /** The vault to preselect once vaults load: the one used last time. */
 let preferredVaultId: string | null = null;
@@ -176,9 +179,14 @@ function setFile(path: string | null): void {
  * Every new file goes through here, whether it came from Finder, the
  * menu-bar icon, a drop on the window or the file picker. During a save it
  * waits, so the file being saved is never swapped out.
+ *
+ * Only a save makes it wait, not any call to 1Password. On a fresh start the
+ * window is loading vaults (and waiting for approval) just as the Quick
+ * Action's file arrives; that file must show up straight away, not sit in
+ * the queue that only a finished save releases.
  */
 function offerFile(file: IncomingFile): void {
-  if (incoming.offer(file, busy)) loadFile(file);
+  if (incoming.offer(file, saving)) loadFile(file);
 }
 
 function loadFile(file: IncomingFile): void {
@@ -246,9 +254,14 @@ function updateSaveButton(): void {
 async function save(allowDuplicate = false): Promise<void> {
   if (!filePath || busy || !vaultSelect.value) return;
   const vaultName = vaultSelect.selectedOptions[0]?.textContent ?? "the vault";
-  const result = await withPromptHint("Saving…", () =>
-    api.save({ filePath: filePath!, vaultId: vaultSelect.value, title: titleInput.value, allowDuplicate }),
-  );
+  const request = { filePath, vaultId: vaultSelect.value, title: titleInput.value, allowDuplicate };
+  saving = true;
+  let result;
+  try {
+    result = await withPromptHint("Saving…", () => api.save(request));
+  } finally {
+    saving = false;
+  }
   if (result.ok) {
     const saved = savedMessage(result.value.title, vaultName, result.value.original);
     const next = incoming.take();
