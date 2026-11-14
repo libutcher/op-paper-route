@@ -96,6 +96,32 @@ describe("Session", () => {
     expect(session.isConnected).toBe(true);
   });
 
+  it("treats 'invalid client id' (1Password locked mid-session) as expiry and reconnects", async () => {
+    // Exactly what the live probe recorded after locking the app mid-session.
+    const revoked = fakeClient(new Error("invalid client id"));
+    const fresh = fakeClient([{ id: "v1", title: "Vault" }]);
+    const connect = fakeConnect(revoked, fresh);
+    const session = new Session({ ...OPTIONS, connect });
+
+    await expect(session.run((c) => c.vaults.list())).resolves.toEqual([{ id: "v1", title: "Vault" }]);
+    expect(connect).toHaveBeenCalledTimes(2);
+    expect(session.isConnected).toBe(true);
+  });
+
+  it("does not retry a denied prompt, and lets the next call prompt again", async () => {
+    const denied = new Error(
+      "An error occurred when processing SDK request: Error { msg: Denied authorization for SDK client, inner: None }",
+    );
+    const connect = fakeConnect(denied, fakeClient([]));
+    const session = new Session({ ...OPTIONS, connect });
+
+    await expect(session.run((c) => c.vaults.list())).rejects.toMatchObject({ code: "NOT_AUTHORIZED" });
+    expect(connect).toHaveBeenCalledTimes(1);
+
+    await expect(session.run((c) => c.vaults.list())).resolves.toEqual([]);
+    expect(connect).toHaveBeenCalledTimes(2);
+  });
+
   it("gives up after one re-authentication if the session keeps expiring", async () => {
     const connect = fakeConnect(fakeClient(new sdk.DesktopSessionExpiredError("expired")));
     const session = new Session({ ...OPTIONS, connect });

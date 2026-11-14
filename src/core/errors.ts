@@ -10,9 +10,9 @@ export type ErrorCode =
   | "APP_NOT_FOUND"
   /** No signed-in account in the app matches the configured account name. */
   | "ACCOUNT_NOT_FOUND"
-  /** The user declined the approval prompt, or the app is locked. */
+  /** The user declined the approval prompt, or cancelled unlocking a locked app. */
   | "NOT_AUTHORIZED"
-  /** The 10-minute inactivity window passed or the app was locked; approving again fixes it. */
+  /** The 10-minute inactivity window passed or the app locked mid-session; approving again fixes it. */
   | "SESSION_EXPIRED"
   | "RATE_LIMITED"
   | "FILE_UNREADABLE"
@@ -63,15 +63,24 @@ const MESSAGES: Record<Exclude<ErrorCode, "UNKNOWN">, string> = {
  *    (shared_lib_core.js, when the app or its dylib is missing)
  *  - "...Error { msg: Account not found, inner: None }" (observed in M0)
  *
- * NOT YET MAPPED: the wording for a declined prompt and for a locked app. Until
- * a live probe records the exact strings these surface as UNKNOWN. A guessed
- * pattern is worse than none: words like "denied" also appear in unrelated
- * errors (e.g. a write to a read-only vault), which would tell the user to
- * unlock 1Password when that isn't the problem.
+ * Recorded by a live probe against 1Password 8.12 (2026-11-14):
+ *  - "...Error { msg: Denied authorization for SDK client, inner: None }"
+ *    when the user denies the approval prompt, AND when 1Password is locked and
+ *    the user cancels the unlock. A locked app has no message of its own.
+ *  - "invalid client id" when 1Password locks during a session. The SDK does
+ *    NOT raise DesktopSessionExpiredError for this: the next call waits while
+ *    1Password prompts again, then fails with this plain Error. Mapping it to
+ *    SESSION_EXPIRED is what lets Session drop the revoked client and reconnect.
+ *
+ * Patterns match these exact phrases only. Generic words like "denied" also
+ * appear in unrelated errors (e.g. a write to a read-only vault) and must not
+ * be read as an approval problem.
  */
 const MESSAGE_PATTERNS: ReadonlyArray<readonly [RegExp, Exclude<ErrorCode, "UNKNOWN">]> = [
   [/desktop application not found|Native library is not available/i, "APP_NOT_FOUND"],
   [/Account not found/i, "ACCOUNT_NOT_FOUND"],
+  [/Denied authorization for SDK client/i, "NOT_AUTHORIZED"],
+  [/invalid client id/i, "SESSION_EXPIRED"],
 ];
 
 /** Wrap anything thrown by the SDK (or already a PaperRouteError) into a PaperRouteError. */

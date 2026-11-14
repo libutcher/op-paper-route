@@ -26,6 +26,17 @@ describe("fromSdkError", () => {
     expect(fromSdkError(new Error("Native library is not available.")).code).toBe("APP_NOT_FOUND");
   });
 
+  it("maps the messages recorded by the live probe", () => {
+    // Denied prompt, and also a locked app whose unlock was cancelled.
+    const denied = new Error(
+      "An error occurred when processing SDK request: Error { msg: Denied authorization for SDK client, inner: None }",
+    );
+    expect(fromSdkError(denied).code).toBe("NOT_AUTHORIZED");
+
+    // 1Password locked mid-session: a plain Error, not DesktopSessionExpiredError.
+    expect(fromSdkError(new Error("invalid client id")).code).toBe("SESSION_EXPIRED");
+  });
+
   it("does not guess NOT_AUTHORIZED from generic wording", () => {
     // Until the real declined/locked strings are captured, none of these may be
     // mislabelled as an approval problem.
