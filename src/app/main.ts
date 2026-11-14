@@ -35,6 +35,8 @@ const HOTKEY_WORDS = "Control-Option-P";
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
+/** Set once start() has created the handlers; the menu needs them for Choose Account. */
+let appHandlers: ReturnType<typeof createHandlers> | null = null;
 
 // Files handed to the app from outside the window wait here until the window
 // is ready for them.
@@ -107,6 +109,7 @@ async function start(): Promise<void> {
     // The Trash, not deletion: the user can always get the file back.
     trash: (path) => shell.trashItem(path),
   });
+  appHandlers = handlers;
 
   // Only our own page may call these. Arguments are validated in handlers.
   const fromOurWindow = (event: IpcMainInvokeEvent) => isOurPage(event.senderFrame?.url, INDEX_HTML);
@@ -230,6 +233,7 @@ function refreshTrayMenu(): void {
       // Show the shortcut in the menu, but don't register it a second time:
       // the global shortcut already owns it.
       { label: "Save a Document…", accelerator: HOTKEY, registerAccelerator: false, click: showWindow },
+      { label: "Choose Account…", click: () => void (appHandlers && chooseAccount(appHandlers)) },
       { type: "separator" },
       // Only a packaged app can install a Quick Action that finds it by bundle
       // id; a development copy uses `npm run install-quick-action` instead.
@@ -277,6 +281,35 @@ function markWindowReady(): void {
   if (windowReady) return;
   windowReady = true;
   if (showWhenReady) showWindow();
+}
+
+/**
+ * Forget the current account and restart onto the first-run screen, where a
+ * different account can be entered. Restarting is the point: 1Password's
+ * approval belongs to the process, and nothing inside the process can revoke
+ * it, so forgetting the account without restarting would leave the old
+ * account's approval usable.
+ */
+async function chooseAccount(handlers: ReturnType<typeof createHandlers>): Promise<void> {
+  const { accountName } = await handlers.getState();
+  if (!accountName) {
+    showWindow(); // already on the first-run screen
+    return;
+  }
+  const { response } = await dialog.showMessageBox({
+    type: "question",
+    buttons: ["Choose Account", "Cancel"],
+    defaultId: 1,
+    cancelId: 1,
+    message: `Choose a different account than “${accountName}”?`,
+    detail:
+      "PaperRoute will forget this account and restart, then ask for an account name. " +
+      "1Password's approval for this account ends with the restart. Nothing in 1Password is changed.",
+  });
+  if (response !== 0) return;
+  await handlers.forgetAccount();
+  app.relaunch();
+  app.exit(0);
 }
 
 function showWindow(): void {

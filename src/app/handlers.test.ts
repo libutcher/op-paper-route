@@ -223,18 +223,18 @@ describe("handlers", () => {
     await handlers.setAccount("Example Family");
     await expect(handlers.save({ filePath: file, vaultId: VAULT, title: "  " })).resolves.toMatchObject({
       ok: true,
-      value: { title: "receipt.pdf" },
+      value: { title: "receipt" },
     });
   });
 
   it("returns core errors with their code and details, and doesn't remember the vault on failure", async () => {
     const { handlers, client, settings } = setup();
     await handlers.setAccount("Example Family");
-    client.seed({ id: "existing", title: "receipt.pdf", vaultId: VAULT, category: "Document" as never });
+    client.seed({ id: "existing", title: "receipt", vaultId: VAULT, category: "Document" as never });
 
     await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toEqual({
       ok: false,
-      error: expect.objectContaining({ code: "DUPLICATE_TITLE", details: { title: "receipt.pdf", itemId: "existing" } }),
+      error: expect.objectContaining({ code: "DUPLICATE_TITLE", details: { title: "receipt", itemId: "existing" } }),
     });
     await expect(settings.get()).resolves.toMatchObject({ lastVaultId: null });
 
@@ -343,7 +343,7 @@ describe("move to Trash after saving", () => {
 
   it("leaves the original alone when the save fails", async () => {
     const { handlers, trash, client } = await withTrashOn();
-    client.seed({ id: "existing", title: "receipt.pdf", vaultId: VAULT, category: "Document" as never });
+    client.seed({ id: "existing", title: "receipt", vaultId: VAULT, category: "Document" as never });
 
     await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
       ok: false,
@@ -436,5 +436,33 @@ describe("move to Trash after saving", () => {
     expect(client.stored.size).toBe(1);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("couldn't move the original to the Trash"));
     warn.mockRestore();
+  });
+});
+
+describe("forgetAccount (Choose Account…)", () => {
+  it("forgets the account and last vault, keeps the Trash option, and needs a fresh account afterwards", async () => {
+    const { handlers, settings, connect } = setup();
+    await handlers.setAccount("Example Family");
+    await handlers.setTrashAfterSave(true);
+    await handlers.save({ filePath: file, vaultId: VAULT });
+    await expect(settings.get()).resolves.toMatchObject({ accountName: "Example Family", lastVaultId: VAULT });
+    const before = connect.mock.calls.length;
+
+    await handlers.forgetAccount();
+
+    await expect(settings.get()).resolves.toEqual({ accountName: null, lastVaultId: null, trashAfterSave: true });
+    await expect(handlers.listVaults()).resolves.toMatchObject({ ok: false, error: { code: "ACCOUNT_NOT_FOUND" } });
+    expect(connect).toHaveBeenCalledTimes(before);
+
+    // Setting an account again starts over with a new session.
+    await writeFile(file, "pdf bytes");
+    await expect(handlers.setAccount("Example Family")).resolves.toMatchObject({ ok: true });
+    expect(connect).toHaveBeenCalledTimes(before + 1);
+  });
+
+  it("is harmless when no account was ever set", async () => {
+    const { handlers, settings } = setup();
+    await expect(handlers.forgetAccount()).resolves.toBeUndefined();
+    await expect(settings.get()).resolves.toMatchObject({ accountName: null });
   });
 });

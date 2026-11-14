@@ -33,9 +33,10 @@ describe.skipIf(!ACCOUNT)("live: saveDocument against the 1Password app", () => 
       const vault = await findVault(session, VAULT);
 
       const dir = await mkdtemp(join(tmpdir(), "paper-route-live-"));
-      const title = `live-test-${new Date().toISOString()}.txt`;
-      const filePath = join(dir, title);
-      const bytes = new TextEncoder().encode(`PaperRoute live test ${title}\n`);
+      const fileName = `live-test-${new Date().toISOString()}.txt`;
+      const title = fileName.slice(0, -".txt".length); // the default title drops the extension
+      const filePath = join(dir, fileName);
+      const bytes = new TextEncoder().encode(`PaperRoute live test ${fileName}\n`);
       await writeFile(filePath, bytes);
 
       let itemId: string | undefined;
@@ -47,7 +48,7 @@ describe.skipIf(!ACCOUNT)("live: saveDocument against the 1Password app", () => 
         });
         itemId = result.itemId;
 
-        expect(result).toMatchObject({ vaultId: vault.id, title, fileName: title, bytes: bytes.byteLength });
+        expect(result).toMatchObject({ vaultId: vault.id, title, fileName, bytes: bytes.byteLength });
 
         const listed = await session.run((c) => c.items.list(vault.id));
         expect(listed.find((i) => i.id === itemId)).toMatchObject({
