@@ -12,7 +12,8 @@
     "start": "npm run build && env -u ELECTRON_RUN_AS_NODE electron .",
     "install-quick-action": "npm run build && node scripts/quick-action.mjs install",
     "uninstall-quick-action": "node scripts/quick-action.mjs uninstall",
-    "render-icons": "node scripts/render-icons.mjs"
+    "render-icons": "node scripts/render-icons.mjs",
+    "package": "npm run build && node scripts/package.mjs"
   },
   "private": true,
   "type": "module",
@@ -23,6 +24,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@electron/packager": "18.4.4",
     "@types/node": "20.19.43",
     "electron": "45.3.2",
     "tsx": "4.23.15",
