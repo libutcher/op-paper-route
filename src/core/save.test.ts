@@ -1,11 +1,11 @@
-import { mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sdk from "@1password/sdk";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fakeClient, type FakeClient } from "./fake-client.test-util.js";
 import { ALWAYS_FITS_BYTES, MAX_ENCODED_BYTES, NEVER_FITS_BYTES } from "./limits.js";
-import { saveDocument } from "./save.js";
+import { preflightFile, saveDocument } from "./save.js";
 import { Session } from "./session.js";
 
 const VAULT = "v-test";
@@ -39,6 +39,36 @@ function setup(client: FakeClient = fakeClient([{ id: VAULT, title: "PaperRouteT
   });
   return { session, client };
 }
+
+describe("preflightFile", () => {
+  it("returns the file name and size for a readable file", async () => {
+    await expect(preflightFile(smallFile)).resolves.toEqual({ fileName: "receipt.txt", size: smallBytes.byteLength });
+  });
+
+  it("rejects a missing file, a folder, and a file that can never fit", async () => {
+    await expect(preflightFile(join(dir, "missing.pdf"))).rejects.toMatchObject({ code: "FILE_UNREADABLE" });
+    await expect(preflightFile(dir)).rejects.toMatchObject({ code: "FILE_UNREADABLE" });
+
+    const giant = join(dir, "preflight-giant.bin");
+    await writeFile(giant, "");
+    await truncate(giant, NEVER_FITS_BYTES);
+    await expect(preflightFile(giant)).rejects.toMatchObject({ code: "FILE_TOO_LARGE" });
+  });
+
+  it("rejects a file it isn't allowed to read", async () => {
+    const locked = join(dir, "no-read.txt");
+    await writeFile(locked, "secret");
+    await chmod(locked, 0o000);
+    try {
+      // Root ignores permissions; skip the assertion rather than fail there.
+      if (process.getuid?.() !== 0) {
+        await expect(preflightFile(locked)).rejects.toMatchObject({ code: "FILE_UNREADABLE" });
+      }
+    } finally {
+      await chmod(locked, 0o600);
+    }
+  });
+});
 
 describe("saveDocument", () => {
   it("creates a Document item named after the file, verifies it, and reports the result", async () => {
@@ -115,6 +145,17 @@ describe("saveDocument", () => {
     await expect(saveDocument(session, { filePath: join(dir, "missing.pdf"), vaultId: VAULT })).rejects.toMatchObject({
       code: "FILE_UNREADABLE",
       details: { fileName: "missing.pdf" },
+    });
+    expect(session.isConnected).toBe(false);
+    expect(client.items.create).not.toHaveBeenCalled();
+  });
+
+  it("fails with FILE_UNREADABLE for a folder, before touching 1Password", async () => {
+    const { session, client } = setup();
+
+    await expect(saveDocument(session, { filePath: dir, vaultId: VAULT })).rejects.toMatchObject({
+      code: "FILE_UNREADABLE",
+      message: expect.stringContaining("it's a folder"),
     });
     expect(session.isConnected).toBe(false);
     expect(client.items.create).not.toHaveBeenCalled();

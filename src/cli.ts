@@ -11,7 +11,7 @@
 
 import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
-import { PaperRouteError, Session, findVault, listVaults, saveDocument } from "./core/index.js";
+import { PaperRouteError, Session, findVault, listVaults, preflightFile, saveDocument } from "./core/index.js";
 
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
@@ -118,6 +118,9 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case "save": {
+      // Check the file before findVault, which is the first 1Password call: a
+      // missing or oversized file shouldn't cost an approval prompt.
+      await preflightFile(filePath);
       const vault = await findVault(session, vaultQuery);
       const result = await saveDocument(session, {
         filePath,

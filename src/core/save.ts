@@ -8,7 +8,8 @@
  * leaves nothing behind.
  */
 
-import { readFile, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, readFile, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import sdk from "@1password/sdk";
 import type { ItemCreateParams } from "@1password/sdk";
@@ -39,30 +40,47 @@ export interface SaveResult {
   bytes: number;
 }
 
-export async function saveDocument(session: Session, request: SaveRequest): Promise<SaveResult> {
-  const fileName = basename(request.filePath);
-  const title = request.title?.trim() || fileName;
+function unreadable(fileName: string, err: unknown, reason?: string): PaperRouteError {
+  return new PaperRouteError(
+    "FILE_UNREADABLE",
+    `${messageFor("FILE_UNREADABLE")}: ${fileName}${reason ? ` (${reason})` : ""}`,
+    { cause: err, details: { fileName } },
+  );
+}
 
-  const unreadable = (err: unknown) =>
-    new PaperRouteError("FILE_UNREADABLE", `${messageFor("FILE_UNREADABLE")}: ${fileName}`, {
-      cause: err,
-      details: { fileName },
-    });
-  const tooLargeBySize = (bytes: number, cause?: unknown) =>
-    new PaperRouteError("FILE_TOO_LARGE", `${messageFor("FILE_TOO_LARGE")}: ${fileName}`, {
-      cause,
-      details: { fileName, bytes, limit: MAX_ENCODED_BYTES, maxFileBytes: NEVER_FITS_BYTES - 1 },
-    });
+function tooLargeBySize(fileName: string, bytes: number, cause?: unknown): PaperRouteError {
+  return new PaperRouteError("FILE_TOO_LARGE", `${messageFor("FILE_TOO_LARGE")}: ${fileName}`, {
+    cause,
+    details: { fileName, bytes, limit: MAX_ENCODED_BYTES, maxFileBytes: NEVER_FITS_BYTES - 1 },
+  });
+}
 
-  // 1. A file that can't fit whatever its contents is rejected from its size
-  //    alone, without reading it into memory.
-  let size: number;
+/**
+ * Everything that can be checked about a file without 1Password and without
+ * reading it: it exists, is a regular file, is readable, and isn't too large
+ * to fit whatever its contents. Callers that do other SDK work before saving
+ * (like resolving a vault by name) should call this first, so a bad file is
+ * reported before the approval prompt rather than after it. saveDocument
+ * calls it too.
+ */
+export async function preflightFile(filePath: string): Promise<{ fileName: string; size: number }> {
+  const fileName = basename(filePath);
+  let info: Awaited<ReturnType<typeof stat>>;
   try {
-    size = (await stat(request.filePath)).size;
+    info = await stat(filePath);
+    await access(filePath, constants.R_OK);
   } catch (err) {
-    throw unreadable(err);
+    throw unreadable(fileName, err);
   }
-  if (sizeHint(size) === "too-large") throw tooLargeBySize(size);
+  if (!info.isFile()) throw unreadable(fileName, null, info.isDirectory() ? "it's a folder" : "not a regular file");
+  if (sizeHint(info.size) === "too-large") throw tooLargeBySize(fileName, info.size);
+  return { fileName, size: info.size };
+}
+
+export async function saveDocument(session: Session, request: SaveRequest): Promise<SaveResult> {
+  // 1. Exists, is a readable regular file, and isn't too large to ever fit.
+  const { fileName, size } = await preflightFile(request.filePath);
+  const title = request.title?.trim() || fileName;
 
   // 2. Read into memory. No temp copies; the path itself is never stored in the item.
   //    The exact check below still runs on what was read, in case the file
@@ -76,8 +94,8 @@ export async function saveDocument(session: Session, request: SaveRequest): Prom
     content = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   } catch (err) {
     // Node refuses to read files over 2 GiB; that's a size problem, not an unreadable file.
-    if ((err as NodeJS.ErrnoException).code === "ERR_FS_FILE_TOO_LARGE") throw tooLargeBySize(size, err);
-    throw unreadable(err);
+    if ((err as NodeJS.ErrnoException).code === "ERR_FS_FILE_TOO_LARGE") throw tooLargeBySize(fileName, size, err);
+    throw unreadable(fileName, err);
   }
 
   // 3. Will these exact bytes fit in one SDK message? Decided before any prompt.

@@ -18,6 +18,6 @@ export {
   sizeHint,
   type FitCheck,
 } from "./limits.js";
-export { saveDocument, type SaveRequest, type SaveResult } from "./save.js";
+export { preflightFile, saveDocument, type SaveRequest, type SaveResult } from "./save.js";
 export { Session, connectWithSdk, type Connect, type ConnectOptions, type SessionOptions } from "./session.js";
 export { findVault, listVaults, type VaultSummary } from "./vaults.js";
