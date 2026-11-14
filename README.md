@@ -22,7 +22,6 @@ What PaperRoute never does: it stores no tokens or passwords, uses no service ac
 
 - **macOS** on Apple silicon (an Intel build can be made from source).
 - **The 1Password desktop app**, with **Settings → Developer → Integrate with 1Password SDKs** turned on. PaperRoute talks to 1Password only through this.
-- **Node 20 or later**, only if you build from source.
 
 ## Installation
 
@@ -30,7 +29,7 @@ What PaperRoute never does: it stores no tokens or passwords, uses no service ac
 2. Open it from Applications. PaperRoute isn't signed with an Apple Developer ID yet, so macOS may refuse the first time: go to **System Settings → Privacy & Security**, find the message about PaperRoute, and choose **Open Anyway**. You only do this once.
 3. Click the paper-plane icon in the menu bar and choose **Install Finder Quick Action…**. The same menu item removes it again.
 
-To build the disk image yourself: `npm install`, then `npm run dmg`. It lands in `out/`.
+To build the disk image yourself, see [Development](#development).
 
 ## Using PaperRoute
 
@@ -63,7 +62,7 @@ Settings (the account name, the last vault and the Trash option) are kept in `~/
 
 ## Development
 
-Needs Node 20 or later.
+Building from source needs **Node 20 or later** (and macOS, for packaging and the Quick Action). `npm run dmg` builds the disk image into `out/`.
 
 ```sh
 npm install
