@@ -166,7 +166,7 @@ async function start(): Promise<void> {
 function createWindow(): void {
   win = new BrowserWindow({
     width: 440,
-    height: 508,
+    height: 480,
     show: false,
     resizable: false,
     minimizable: false,
@@ -247,6 +247,13 @@ function refreshTrayMenu(): void {
       // Show the shortcut in the menu, but don't register it a second time:
       // the global shortcut already owns it.
       { label: "Save a Document…", accelerator: HOTKEY, registerAccelerator: false, click: showWindow },
+      {
+        label: "1Password Account & Approval…",
+        click: () => {
+          showWindow();
+          win?.webContents.send(CHANNELS.showSetup);
+        },
+      },
       { type: "separator" },
       // Only a packaged app can install a Quick Action that finds it by bundle
       // id; a development copy uses `npm run install-quick-action` instead.

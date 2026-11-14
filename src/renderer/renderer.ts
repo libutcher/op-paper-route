@@ -465,6 +465,9 @@ if (state.accountName) {
 // The main process drops 1Password's approval when the window hides or goes
 // idle (and after each save, if that option is on): the next call will prompt.
 api.onApprovalDropped(() => approval.reset());
+// From the menu-bar menu: change the account or the approval option. The
+// account field is already prefilled with the current name.
+api.onShowSetup(() => showAccountView());
 api.onIncomingFile(offerFile);
 const early = await api.takeIncomingFile();
 if (early) offerFile(early);

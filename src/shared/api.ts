@@ -83,6 +83,8 @@ export interface PaperRouteApi {
   onIncomingFile(listener: (file: IncomingFile) => void): void;
   /** Called when the main process drops 1Password's approval (window hidden, idle, or after a save); the next call will prompt. */
   onApprovalDropped(listener: () => void): void;
+  /** Called when the user chooses the account/approval settings from the menu-bar menu. */
+  onShowSetup(listener: () => void): void;
 }
 
 /** IPC channel names, shared so main and preload can't drift apart. */
@@ -99,4 +101,5 @@ export const CHANNELS = {
   setTrashAfterSave: "paper-route:set-trash-after-save",
   setApproveEverySave: "paper-route:set-approve-every-save",
   approvalDropped: "paper-route:approval-dropped",
+  showSetup: "paper-route:show-setup",
 } as const;

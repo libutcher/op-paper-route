@@ -25,6 +25,7 @@ const CH = {
   setTrashAfterSave: "paper-route:set-trash-after-save",
   setApproveEverySave: "paper-route:set-approve-every-save",
   approvalDropped: "paper-route:approval-dropped",
+  showSetup: "paper-route:show-setup",
 };
 
 const api: PaperRouteApi = {
@@ -36,6 +37,9 @@ const api: PaperRouteApi = {
   setApproveEverySave: (on) => ipcRenderer.invoke(CH.setApproveEverySave, on),
   onApprovalDropped: (listener) => {
     ipcRenderer.on(CH.approvalDropped, () => listener());
+  },
+  onShowSetup: (listener) => {
+    ipcRenderer.on(CH.showSetup, () => listener());
   },
   chooseFile: () => ipcRenderer.invoke(CH.chooseFile),
   pathForFile: (file) => webUtils.getPathForFile(file),
