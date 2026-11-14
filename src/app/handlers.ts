@@ -110,10 +110,11 @@ export function createHandlers(options: HandlerOptions): Handlers {
       if (title !== undefined && typeof title !== "string") return invalid("Title must be text");
 
       return attempt(async () => {
-        const { trashAfterSave } = await settings.get();
         // Taken before the save, to check afterwards that the file on disk is
-        // still the one that was saved before moving it to the Trash.
-        const before = trashAfterSave ? await fingerprint(filePath) : null;
+        // still the one that was saved before moving it to the Trash. Taken
+        // whatever the Trash setting is now, because the setting that counts
+        // is the one in effect when the save finishes (see below).
+        const before = await fingerprint(filePath);
 
         const result = await saveDocument(await requireSession(), {
           filePath,
@@ -131,6 +132,10 @@ export function createHandlers(options: HandlerOptions): Handlers {
 
         // saveDocument only returns once the bytes have been read back from
         // 1Password and matched, so the document is safely stored here.
+        // Read the Trash option now, not when the save started: a save can
+        // wait minutes for 1Password's approval, and if the box was unticked
+        // meanwhile, that is what the user wants for this file.
+        const { trashAfterSave } = await settings.get();
         let original: OriginalFile = "kept";
         if (trashAfterSave) {
           const after = await fingerprint(filePath);

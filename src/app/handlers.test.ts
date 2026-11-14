@@ -306,6 +306,45 @@ describe("move to Trash after saving", () => {
     expect(await readFile(file, "utf8")).toBe("a newer, longer version of the pdf");
   });
 
+  it("uses the Trash setting as it is when the save finishes, not when it started", async () => {
+    // The user unticks the box while the save waits (e.g. for approval).
+    const client = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
+    const realCreate = client.items.create;
+    let handlersRef: ReturnType<typeof setup>["handlers"] | null = null;
+    client.items.create = vi.fn(async (params: Parameters<typeof realCreate>[0]) => {
+      await handlersRef!.setTrashAfterSave(false);
+      return realCreate(params);
+    });
+    const unticked = await withTrashOn(client);
+    handlersRef = unticked.handlers;
+
+    await expect(unticked.handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: true,
+      value: { original: "kept" },
+    });
+    expect(unticked.trash).not.toHaveBeenCalled();
+    expect(existsSync(file)).toBe(true);
+  });
+
+  it("honours the box being ticked during a save, too", async () => {
+    const client = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
+    const realCreate = client.items.create;
+    let handlersRef: ReturnType<typeof setup>["handlers"] | null = null;
+    client.items.create = vi.fn(async (params: Parameters<typeof realCreate>[0]) => {
+      await handlersRef!.setTrashAfterSave(true);
+      return realCreate(params);
+    });
+    const ticked = setup(client);
+    handlersRef = ticked.handlers;
+    await ticked.handlers.setAccount("Example Family");
+
+    await expect(ticked.handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
+      ok: true,
+      value: { original: "trashed" },
+    });
+    expect(existsSync(file)).toBe(false);
+  });
+
   it("still reports the save as successful when moving to the Trash fails", async () => {
     const { handlers, trash, client } = await withTrashOn();
     trash.mockRejectedValueOnce(new Error("Trash unavailable"));
