@@ -24,13 +24,14 @@ import { FuseV1Options, FuseVersion, flipFuses } from "@electron/fuses";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(join(REPO, "package.json"), "utf8"));
-export const BUNDLE_ID = "io.github.libutcher.paperroute";
 const ENTITLEMENTS = join(REPO, "build", "entitlements.plist");
 const ICON = join(REPO, "build", "PaperRoute.icns");
 
 if (!existsSync(join(REPO, "dist", "app", "main.js"))) {
   throw new Error("Build first: npm run build (npm run package does this for you).");
 }
+// The same identifier the app's Quick Action uses to find it, from one place.
+const { BUNDLE_ID } = await import(join(REPO, "dist", "app", "quick-action.js"));
 
 // Only what the app needs at run time goes into the package.
 const KEEP = [/^\/package\.json$/, /^\/dist(\/|$)/, /^\/assets(\/|$)/, /^\/node_modules(\/|$)/];

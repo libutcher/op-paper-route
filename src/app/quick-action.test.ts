@@ -4,10 +4,19 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MENU_TITLE, launcherScript, removeWorkflow, shellQuote, writeWorkflow } from "./quick-action.mjs";
+import {
+  BUNDLE_ID,
+  MENU_TITLE,
+  developmentLauncherScript,
+  packagedLauncherScript,
+  quickActionState,
+  removeWorkflow,
+  shellQuote,
+  writeWorkflow,
+} from "./quick-action.js";
 
 const onMac = process.platform === "darwin";
-let dir;
+let dir: string;
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "paper-route-qa-"));
@@ -25,10 +34,10 @@ describe("shellQuote", () => {
   });
 });
 
-describe("launcherScript", () => {
+describe("developmentLauncherScript", () => {
   it("is valid shell and recovers the folder path exactly", async () => {
     const repo = `/tmp/it's a "test" $HOME \`x\` & more`;
-    const script = launcherScript(repo);
+    const script = developmentLauncherScript(repo);
     const file = join(dir, "launcher.zsh");
     await writeFile(file, script);
     execFileSync("zsh", ["-n", file]);
@@ -38,9 +47,25 @@ describe("launcherScript", () => {
   });
 
   it("clears ELECTRON_RUN_AS_NODE and runs in the background", () => {
-    const script = launcherScript("/repo");
+    const script = developmentLauncherScript("/repo");
     expect(script).toContain("unset ELECTRON_RUN_AS_NODE");
     expect(script).toMatch(/nohup "\$ELECTRON" "\$REPO" "\$@" .*&\n$/);
+  });
+});
+
+describe("packagedLauncherScript", () => {
+  it("is valid shell and opens the files with the app by bundle id, wherever it's installed", async () => {
+    const script = packagedLauncherScript();
+    const file = join(dir, "packaged.zsh");
+    await writeFile(file, script);
+    execFileSync("zsh", ["-n", file]);
+
+    expect(script).toContain(`open -b '${BUNDLE_ID}' "$@"`);
+    expect(script).not.toMatch(/\/Applications|\.app\b|ELECTRON/);
+  });
+
+  it("quotes the bundle id for the shell", () => {
+    expect(packagedLauncherScript("x'; rm -rf ~; '")).toContain(`open -b 'x'\\''; rm -rf ~; '\\''' "$@"`);
   });
 });
 
@@ -52,7 +77,7 @@ describe.skipIf(!onMac)("writeWorkflow", () => {
     const doc = join(bundle, "Contents", "document.wflow");
     execFileSync("plutil", ["-lint", "-s", info, doc]);
 
-    const read = (path, key) => execFileSync("plutil", ["-extract", key, "raw", "-o", "-", path]).toString().trim();
+    const read = (path: string, key: string) => execFileSync("plutil", ["-extract", key, "raw", "-o", "-", path]).toString().trim();
     expect(read(info, "NSServices.0.NSMenuItem.default")).toBe(MENU_TITLE);
     expect(read(info, "NSServices.0.NSRequiredContext.NSApplicationIdentifier")).toBe("com.apple.finder");
     // Without an icon, Finder lists it under Services instead of Quick Actions.
@@ -81,7 +106,7 @@ describe.skipIf(!onMac)("writeWorkflow", () => {
     expect(command()).toBe("echo working");
 
     // A BigInt can't be turned into JSON, so writing the new plist throws.
-    await expect(writeWorkflow(bundle, 1n)).rejects.toThrow();
+    await expect(writeWorkflow(bundle, 1n as unknown as string)).rejects.toThrow();
 
     expect(command()).toBe("echo working");
     const { readdir } = await import("node:fs/promises");
@@ -94,6 +119,21 @@ describe.skipIf(!onMac)("writeWorkflow", () => {
     await writeFile(join(bundle, "Contents", "stale.txt"), "old");
     await writeWorkflow(bundle, "echo two");
     expect(existsSync(join(bundle, "Contents", "stale.txt"))).toBe(false);
+  });
+});
+
+describe.skipIf(!onMac)("quickActionState", () => {
+  it("tells the packaged app's Quick Action apart from a development copy's", async () => {
+    const ours = join(dir, "Ours.workflow");
+    const other = join(dir, "Other.workflow");
+    await writeWorkflow(ours, packagedLauncherScript());
+    await writeWorkflow(other, developmentLauncherScript("/some/repo"));
+
+    expect(quickActionState(ours)).toBe("ours");
+    expect(quickActionState(other)).toBe("other");
+    expect(quickActionState(join(dir, "Missing.workflow"))).toBe("none");
+    // A different app's bundle id doesn't count as ours.
+    expect(quickActionState(ours, "com.example.other")).toBe("other");
   });
 });
 
