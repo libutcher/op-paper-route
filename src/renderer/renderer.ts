@@ -6,7 +6,16 @@
  * is filled in, the last vault is already selected, press Return.
  */
 
-import type { ApiError, ErrorCode, PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
+import type { PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
+import {
+  ApprovalTracker,
+  describeError,
+  fileNameOf,
+  isRetryable,
+  slowCallMessage,
+  titleFor,
+  vaultOptions,
+} from "../shared/window-logic.js";
 
 declare global {
   interface Window {
@@ -16,13 +25,10 @@ declare global {
 
 const api = window.paperRoute;
 
-/** Errors where the same request may succeed if sent again. */
-const RETRYABLE: ReadonlySet<ErrorCode> = new Set(["NOT_AUTHORIZED", "SESSION_EXPIRED", "RATE_LIMITED", "APP_NOT_FOUND", "UNKNOWN"]);
-
 /** After this long without an answer, say something so the window doesn't look frozen. */
 const PROMPT_HINT_AFTER_MS = 1500;
-/** 1Password ends an approval after ten minutes without use. */
-const APPROVAL_IDLE_MS = 10 * 60 * 1000;
+
+const approval = new ApprovalTracker();
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -77,64 +83,18 @@ async function withPromptHint<T>(working: string, call: () => Promise<Result<T>>
   busy = true;
   updateSaveButton();
   setStatus(working, "info");
-  // Only tell the user to approve something when a prompt is likely. With a
-  // recent approval a slow call is usually just slow (a big upload), though
-  // 1Password can still prompt if it was locked meanwhile, so say that softly.
-  const hint = setTimeout(
-    () =>
-      promptLikely()
-        ? setStatus("Waiting for 1Password — approve the request in the 1Password app.", "waiting")
-        : setStatus(`${working} Still working. If 1Password asks for approval, approve it there.`, "info"),
-    PROMPT_HINT_AFTER_MS,
-  );
+  const hint = setTimeout(() => {
+    const { text, tone } = slowCallMessage(working, approval.promptLikely());
+    setStatus(text, tone);
+  }, PROMPT_HINT_AFTER_MS);
   try {
     const result = await call();
-    noteOutcome(result);
+    approval.note(result);
     return result;
   } finally {
     clearTimeout(hint);
     busy = false;
     updateSaveButton();
-  }
-}
-
-/** When 1Password last answered a request from this window, or null if it hasn't (or its approval has ended). */
-let lastAnsweredAt: number | null = null;
-
-/** Errors that mean the approval is missing or gone, so the next call will prompt. */
-const APPROVAL_LOST: ReadonlySet<ErrorCode> = new Set(["NOT_AUTHORIZED", "SESSION_EXPIRED", "ACCOUNT_NOT_FOUND", "APP_NOT_FOUND"]);
-/** Errors raised before 1Password is contacted; they say nothing about approval. */
-const LOCAL_ONLY: ReadonlySet<ErrorCode> = new Set(["INVALID_REQUEST", "FILE_UNREADABLE", "FILE_TOO_LARGE"]);
-
-function noteOutcome(result: Result<unknown>): void {
-  if (result.ok) lastAnsweredAt = Date.now();
-  else if (APPROVAL_LOST.has(result.error.code)) lastAnsweredAt = null;
-  else if (!LOCAL_ONLY.has(result.error.code)) lastAnsweredAt = Date.now();
-}
-
-/** True when the next call will probably show 1Password's approval prompt. */
-function promptLikely(): boolean {
-  return lastAnsweredAt === null || Date.now() - lastAnsweredAt > APPROVAL_IDLE_MS;
-}
-
-function describeError(error: ApiError): string {
-  const d = error.details;
-  const mb = (n: unknown) => `${(Number(n) / 1024 / 1024).toFixed(1)} MB`;
-  switch (error.code) {
-    case "NOT_AUTHORIZED":
-      return "1Password didn't approve the request.";
-    case "SESSION_EXPIRED":
-      return "The 1Password session ended. Try again to approve a new one.";
-    case "APP_NOT_FOUND":
-      return "1Password isn't running, or “Integrate with 1Password SDKs” is off in Settings → Developer.";
-    case "FILE_TOO_LARGE":
-      return "encoded" in d
-        ? `Too large: this file needs ${mb(d.encoded)} and the limit is ${mb(d.limit)}.`
-        : `Too large: ${mb(d.bytes)}, and nothing over ${mb(d.maxFileBytes)} can fit.`;
-    case "DUPLICATE_TITLE":
-      return `A document called “${String(d.title)}” is already in this vault.`;
-    default:
-      return error.message;
   }
 }
 
@@ -157,7 +117,7 @@ accountView.addEventListener("submit", async (event) => {
   }
   vaultsLoaded = false;
   // A different account means a new session, which 1Password will ask about.
-  lastAnsweredAt = null;
+  approval.reset();
   showSaveView(result.value.lastVaultId);
 });
 
@@ -182,12 +142,7 @@ async function loadVaults(preferredId: string | null): Promise<void> {
 }
 
 function fillVaults(vaults: VaultSummary[], preferredId: string | null): void {
-  // Vault titles repeat in real accounts, so disambiguate those that do.
-  const counts = new Map<string, number>();
-  for (const v of vaults) counts.set(v.title, (counts.get(v.title) ?? 0) + 1);
-  vaultSelect.replaceChildren(
-    ...vaults.map((v) => new Option((counts.get(v.title) ?? 0) > 1 ? `${v.title} (${v.id.slice(0, 6)})` : v.title, v.id)),
-  );
+  vaultSelect.replaceChildren(...vaultOptions(vaults).map(({ value, label }) => new Option(label, value)));
   if (preferredId && vaults.some((v) => v.id === preferredId)) vaultSelect.value = preferredId;
   vaultSelect.disabled = vaults.length === 0;
 }
@@ -196,23 +151,18 @@ function fillVaults(vaults: VaultSummary[], preferredId: string | null): void {
 
 function setFile(path: string | null): void {
   filePath = path;
-  const name = path ? (path.split("/").pop() ?? path) : "";
+  const name = path ? fileNameOf(path) : "";
   fileNameEl.textContent = name;
   fileNameEl.title = path ?? "";
   dropEmpty.hidden = path !== null;
   dropFile.hidden = path === null;
   drop.classList.toggle("has-file", path !== null);
-  // Pre-fill the title with the whole file name, extension included. That is
-  // the title the core and the CLI use by default, and the duplicate check
-  // compares titles exactly, so the same file must get the same title however
-  // it is saved.
-  titleInput.value = name;
+  const title = titleFor(name);
+  titleInput.value = title.value;
   if (path) {
     setStatus("");
     titleInput.focus();
-    // Select just the name part, so typing renames it and keeps the extension.
-    const dot = name.lastIndexOf(".");
-    titleInput.setSelectionRange(0, dot > 0 ? dot : name.length);
+    titleInput.setSelectionRange(title.selectStart, title.selectEnd);
   }
   updateSaveButton();
 }
@@ -289,10 +239,7 @@ async function save(allowDuplicate = false): Promise<void> {
     ]);
     return;
   }
-  // Offer Try Again only where trying again can work. Input problems
-  // (INVALID_REQUEST), a bad file or a failed verification need something to
-  // change first.
-  const retryable = RETRYABLE.has(error.code);
+  const retryable = isRetryable(error.code);
   // Try Again never carries "Save Anyway" over. A failed attempt may still
   // have stored the document (an expiry can be reported after the item
   // landed), so the retry runs the duplicate check again and, if a copy is
