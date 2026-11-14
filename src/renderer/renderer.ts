@@ -169,12 +169,17 @@ function setFile(path: string | null): void {
   dropEmpty.hidden = path !== null;
   dropFile.hidden = path === null;
   drop.classList.toggle("has-file", path !== null);
-  // Pre-fill the title from the file name, without the extension; editable.
-  titleInput.value = path ? name.replace(/\.[^.]+$/, "") : "";
+  // Pre-fill the title with the whole file name, extension included. That is
+  // the title the core and the CLI use by default, and the duplicate check
+  // compares titles exactly, so the same file must get the same title however
+  // it is saved.
+  titleInput.value = name;
   if (path) {
     setStatus("");
     titleInput.focus();
-    titleInput.select();
+    // Select just the name part, so typing renames it and keeps the extension.
+    const dot = name.lastIndexOf(".");
+    titleInput.setSelectionRange(0, dot > 0 ? dot : name.length);
   }
   updateSaveButton();
 }
