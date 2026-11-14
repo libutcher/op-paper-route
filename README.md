@@ -1,4 +1,4 @@
-# Paper Route
+# PaperRoute
 
 A small macOS utility for getting a document you just downloaded into a 1Password vault with as little friction as possible: one Touch ID, drop the file, done.
 
@@ -25,14 +25,14 @@ npm install
 npm start
 ```
 
-Paper Route lives in the menu bar as a 📄 icon, with no Dock icon. Press **Control-Option-P** (or click the icon) to open its window:
+PaperRoute lives in the menu bar as a 📄 icon, with no Dock icon. Press **Control-Option-P** (or click the icon) to open its window:
 
 1. The first time, enter your 1Password account name, as shown at the top of the 1Password sidebar.
 2. Approve the request in 1Password. Approval lasts until 1Password locks or ten minutes pass without use.
 3. Drop a document on the window, or choose one. The title fills in from the file name and the last vault you used is already selected.
 4. Press **Return**. **Esc** hides the window.
 
-If a document with the same title is already in the vault, Paper Route asks before saving another. Saved documents are tagged `paper-route`. Settings (the account name and last vault) are kept in `~/Library/Application Support/paper-route/settings.json`; nothing secret is stored there.
+If a document with the same title is already in the vault, PaperRoute asks before saving another. Saved documents are tagged `paper-route`. Settings (the account name and last vault) are kept in `~/Library/Application Support/paper-route/settings.json`; nothing secret is stored there.
 
 ## Using the CLI
 

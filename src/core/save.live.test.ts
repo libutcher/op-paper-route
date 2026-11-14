@@ -27,7 +27,7 @@ describe.skipIf(!ACCOUNT)("live: saveDocument against the 1Password app", () => 
     async () => {
       const session = new Session({
         accountName: ACCOUNT!,
-        integrationName: "Paper Route live test",
+        integrationName: "PaperRoute live test",
         integrationVersion: "0",
       });
       const vault = await findVault(session, VAULT);
@@ -35,7 +35,7 @@ describe.skipIf(!ACCOUNT)("live: saveDocument against the 1Password app", () => 
       const dir = await mkdtemp(join(tmpdir(), "paper-route-live-"));
       const title = `live-test-${new Date().toISOString()}.txt`;
       const filePath = join(dir, title);
-      const bytes = new TextEncoder().encode(`Paper Route live test ${title}\n`);
+      const bytes = new TextEncoder().encode(`PaperRoute live test ${title}\n`);
       await writeFile(filePath, bytes);
 
       let itemId: string | undefined;

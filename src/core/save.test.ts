@@ -13,7 +13,7 @@ let dir: string;
 let smallFile: string;
 let emptyFile: string;
 let hugeFile: string;
-const smallBytes = new TextEncoder().encode("Paper Route save test\n");
+const smallBytes = new TextEncoder().encode("PaperRoute save test\n");
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "paper-route-save-"));

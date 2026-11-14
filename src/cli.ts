@@ -105,7 +105,7 @@ async function main(argv: string[]): Promise<number> {
   const accountName = values.account ?? process.env["PAPER_ROUTE_ACCOUNT"];
   if (!accountName) return usage("no account: pass --account NAME or set PAPER_ROUTE_ACCOUNT");
 
-  const session = new Session({ accountName, integrationName: "Paper Route CLI", integrationVersion: version });
+  const session = new Session({ accountName, integrationName: "PaperRoute CLI", integrationVersion: version });
   const started = performance.now();
   const elapsed = () => `${((performance.now() - started) / 1000).toFixed(1)}s`;
 

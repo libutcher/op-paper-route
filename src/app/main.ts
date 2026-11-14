@@ -34,7 +34,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on("second-instance", () => showWindow());
   app.whenReady().then(start).catch((err: unknown) => {
-    dialog.showErrorBox("Paper Route couldn't start", String(err));
+    dialog.showErrorBox("PaperRoute couldn't start", String(err));
     app.exit(1);
   });
 }
@@ -48,7 +48,7 @@ async function start(): Promise<void> {
 
   const handlers = createHandlers({
     settings: new SettingsStore(join(app.getPath("userData"), "settings.json")),
-    integrationName: "Paper Route",
+    integrationName: "PaperRoute",
     integrationVersion: version,
   });
 
@@ -95,7 +95,7 @@ function createWindow(): void {
     maximizable: false,
     fullscreenable: false,
     alwaysOnTop: true,
-    title: "Paper Route",
+    title: "PaperRoute",
     webPreferences: {
       preload: join(here, "preload.cjs"),
       sandbox: true,
@@ -125,14 +125,14 @@ function createWindow(): void {
 function createTray(): void {
   tray = new Tray(nativeImage.createEmpty());
   tray.setTitle("📄");
-  tray.setToolTip(`Paper Route — press ${HOTKEY_WORDS} to open`);
+  tray.setToolTip(`PaperRoute — press ${HOTKEY_WORDS} to open`);
   tray.setContextMenu(
     Menu.buildFromTemplate([
       // Show the shortcut in the menu, but don't register it a second time:
       // the global shortcut already owns it.
       { label: "Save a Document…", accelerator: HOTKEY, registerAccelerator: false, click: showWindow },
       { type: "separator" },
-      { label: "Quit Paper Route", role: "quit" },
+      { label: "Quit PaperRoute", role: "quit" },
     ]),
   );
 }

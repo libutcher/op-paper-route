@@ -4,7 +4,7 @@ import type { OnePasswordClient } from "./client.js";
 import { PaperRouteError } from "./errors.js";
 import { Session, type Connect } from "./session.js";
 
-const OPTIONS = { accountName: "Test Account", integrationName: "Paper Route tests", integrationVersion: "0" };
+const OPTIONS = { accountName: "Test Account", integrationName: "PaperRoute tests", integrationVersion: "0" };
 
 /** A client whose vaults.list runs a scripted sequence of outcomes. */
 function fakeClient(...outcomes: Array<unknown[] | Error>): OnePasswordClient {

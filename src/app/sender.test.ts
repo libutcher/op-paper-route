@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { isOurPage } from "./sender.js";
 
-const INDEX = "/Applications/Paper Route.app/Contents/Resources/app/dist/renderer/index.html";
+const INDEX = "/Applications/PaperRoute.app/Contents/Resources/app/dist/renderer/index.html";
 
 describe("isOurPage", () => {
   it("accepts the page's own file URL", () => {

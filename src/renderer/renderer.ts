@@ -1,5 +1,5 @@
 /**
- * The Paper Route window. Runs in a sandboxed page; everything it does goes
+ * The PaperRoute window. Runs in a sandboxed page; everything it does goes
  * through `window.paperRoute` (see src/app/preload.cts).
  *
  * The flow is built to be finished without thinking: drop a file, the title
