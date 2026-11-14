@@ -6,7 +6,7 @@
  * no Node access; it reaches this process only through the IPC handlers below.
  */
 
-import { BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, session, shell } from "electron";
+import { BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, session, shell } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -133,6 +133,9 @@ function createWindow(): void {
     fullscreenable: false,
     alwaysOnTop: true,
     title: "PaperRoute",
+    // Matches the page's own background (styles.css --bg), so there's no
+    // white flash before it draws.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#1e1e20" : "#f6f6f4",
     webPreferences: {
       preload: join(here, "preload.cjs"),
       sandbox: true,
@@ -150,12 +153,31 @@ function createWindow(): void {
   // While the page (re)loads it can't receive files; hold them until it asks.
   win.webContents.on("did-start-loading", () => inbox.reset());
 
+  // Problems inside the window are otherwise invisible: a script error just
+  // leaves a blank window. Send them to the app's log.
+  win.webContents.on("console-message", (event) => {
+    if (event.level === "error" || event.level === "warning") {
+      console.warn(`[paper-route] window ${event.level}: ${event.message} (${event.sourceId}:${event.lineNumber})`);
+    }
+  });
+  win.webContents.on("did-fail-load", (_event, code, description, url) => {
+    console.error(`[paper-route] window failed to load ${url}: ${description} (${code})`);
+  });
+  win.webContents.on("render-process-gone", (_event, details) => {
+    console.error(`[paper-route] window process ended: ${details.reason} (exit code ${details.exitCode})`);
+  });
+
   // Closing hides; the app lives in the menu bar until Quit.
   win.on("close", (event) => {
     if (!quitting) {
       event.preventDefault();
       win?.hide();
     }
+  });
+
+  win.once("ready-to-show", () => {
+    windowReady = true;
+    if (showWhenReady) showWindow();
   });
 
   void win.loadFile(INDEX_HTML);
@@ -177,8 +199,18 @@ function createTray(): void {
   );
 }
 
+/** False until the page has drawn for the first time. */
+let windowReady = false;
+/** Something asked to show the window before it was ready. */
+let showWhenReady = false;
+
 function showWindow(): void {
   if (!win) return;
+  if (!windowReady) {
+    // Showing now would flash an empty window; show once the page has drawn.
+    showWhenReady = true;
+    return;
+  }
   if (!win.isVisible()) win.center();
   win.show();
   win.focus();
