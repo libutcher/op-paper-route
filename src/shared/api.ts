@@ -7,9 +7,7 @@
  * returns a `Result` with the error's code and details spelled out.
  */
 
-import type { ErrorCode, ErrorDetails } from "../core/errors.js";
-import type { SaveResult } from "../core/save.js";
-import type { VaultSummary } from "../core/vaults.js";
+import type { ErrorCode, ErrorDetails, SaveResult, VaultSummary } from "./types.js";
 
 export type { ErrorCode, SaveResult, VaultSummary };
 

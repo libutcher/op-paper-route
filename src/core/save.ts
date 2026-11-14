@@ -16,6 +16,7 @@ import type { ItemCreateParams } from "@1password/sdk";
 import { PaperRouteError, fromSdkError, messageFor } from "./errors.js";
 import { MAX_ENCODED_BYTES, NEVER_FITS_BYTES, checkFits, metadataSize, sizeHint } from "./limits.js";
 import type { Session } from "./session.js";
+import type { SaveResult } from "../shared/types.js";
 
 export interface SaveRequest {
   filePath: string;
@@ -32,13 +33,7 @@ export interface SaveRequest {
   onDuplicate?: "fail" | "allow";
 }
 
-export interface SaveResult {
-  itemId: string;
-  vaultId: string;
-  title: string;
-  fileName: string;
-  bytes: number;
-}
+export type { SaveResult };
 
 function unreadable(fileName: string, err: unknown, reason?: string): PaperRouteError {
   return new PaperRouteError(
