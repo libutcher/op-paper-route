@@ -46,7 +46,8 @@ export class Session {
   readonly #connect: Connect;
   /** In-flight or completed connection. Shared so concurrent first calls cause one prompt. */
   #pending: Promise<OnePasswordClient> | null = null;
-  #connected = false;
+  /** The attempt in #pending that has resolved, if any. */
+  #resolved: Promise<OnePasswordClient> | null = null;
 
   constructor(options: SessionOptions) {
     const { connect, ...connectOptions } = options;
@@ -54,24 +55,28 @@ export class Session {
     this.#connect = connect ?? connectWithSdk;
   }
 
-  /** True once a client has been obtained and not since dropped. */
+  /** True once the current connection attempt has succeeded and not since been dropped. */
   get isConnected(): boolean {
-    return this.#connected;
+    return this.#pending !== null && this.#pending === this.#resolved;
   }
 
   /** The shared client, authenticating on first use. Failures are PaperRouteErrors. */
   client(): Promise<OnePasswordClient> {
     if (!this.#pending) {
-      this.#pending = this.#connect(this.#options).then(
+      // Each attempt is its own promise. The handlers only touch session state
+      // while that attempt is still the current one, so a slow attempt that
+      // settles after disconnect() or a newer attempt can't overwrite it.
+      const attempt: Promise<OnePasswordClient> = this.#connect(this.#options).then(
         (client) => {
-          this.#connected = true;
+          if (this.#pending === attempt) this.#resolved = attempt;
           return client;
         },
         (err: unknown) => {
-          this.#pending = null;
+          this.#drop(attempt);
           throw fromSdkError(err);
         },
       );
+      this.#pending = attempt;
     }
     return this.#pending;
   }
@@ -79,7 +84,12 @@ export class Session {
   /** Forget the client. The next call connects again, which prompts the user again. */
   disconnect(): void {
     this.#pending = null;
-    this.#connected = false;
+    this.#resolved = null;
+  }
+
+  /** Drop `attempt` only if it is still current; a newer connection is left alone. */
+  #drop(attempt: Promise<OnePasswordClient>): void {
+    if (this.#pending === attempt) this.disconnect();
   }
 
   /**
@@ -95,12 +105,15 @@ export class Session {
    * duplicate check first.
    */
   async run<T>(operation: (client: OnePasswordClient) => Promise<T>, { reauth = true } = {}): Promise<T> {
+    const attempt = this.client();
     try {
-      return await operation(await this.client());
+      return await operation(await attempt);
     } catch (err) {
       const error = fromSdkError(err);
       if (error.code === "SESSION_EXPIRED") {
-        this.disconnect();
+        // Drop only the connection this operation used. If another operation
+        // has already reconnected, its fresh (just-approved) client stays.
+        this.#drop(attempt);
         if (reauth) return this.run(operation, { reauth: false });
       }
       throw error;
