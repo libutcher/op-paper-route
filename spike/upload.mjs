@@ -36,13 +36,13 @@ const vaultName = arg("--vault", "PaperRouteTest");
 const t0 = performance.now();
 const lap = (label) => console.log(`[${((performance.now() - t0) / 1000).toFixed(1)}s] ${label}`);
 
-// 1. Read the file into memory. No temp copies.
-const stat = await fs.stat(filePath);
-if (stat.size > MAX_BYTES) {
-  console.error(`file is ${stat.size} bytes; SDK limit is ${MAX_BYTES}`);
+// 1. Read the file into memory. No temp copies. Size is checked on the bytes
+//    actually read, so a file that changes between check and read can't slip past.
+const content = new Uint8Array(await fs.readFile(filePath));
+if (content.byteLength > MAX_BYTES) {
+  console.error(`file is ${content.byteLength} bytes; SDK limit is ${MAX_BYTES}`);
   process.exit(1);
 }
-const content = new Uint8Array(await fs.readFile(filePath));
 lap(`read ${path.basename(filePath)} (${content.byteLength} bytes)`);
 
 // 2. Authenticate via the desktop app. Expect a Touch ID prompt here.
