@@ -48,6 +48,12 @@ async function receive(candidates: readonly string[], cwd: string): Promise<bool
 
 const isDefaultApp = process.defaultApp === true;
 
+// Development only: PAPER_ROUTE_USER_DATA=<folder> runs with separate settings,
+// e.g. to see the first-run screen without losing your own. Only honoured when
+// running unpackaged. Set before the single-instance lock, which is per folder.
+const devUserData = process.env["PAPER_ROUTE_USER_DATA"];
+if (isDefaultApp && devUserData) app.setPath("userData", devUserData);
+
 // macOS "open with" (a file dropped on the app icon, or opened with it from
 // Finder) only fires for a packaged app; wired now so M4 needs no app changes.
 // It can arrive before the app is ready, so it's registered first.
