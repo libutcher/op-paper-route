@@ -86,8 +86,13 @@ export class Session {
    * Run one operation against the client. Anything thrown comes back as a
    * PaperRouteError. On SESSION_EXPIRED the client is dropped and, when
    * `reauth` is true (the default), the operation is retried once — which
-   * shows the approval prompt again. Nothing was done by an operation that
-   * threw SESSION_EXPIRED, so the retry is safe.
+   * shows the approval prompt again.
+   *
+   * Only retry operations that are safe to repeat. An expiry can be reported
+   * after the work was done (the app locking mid-call), so a write that is
+   * retried may happen twice. Pass `reauth: false` for creates; the caller
+   * then surfaces SESSION_EXPIRED and the user's retry goes through any
+   * duplicate check first.
    */
   async run<T>(operation: (client: OnePasswordClient) => Promise<T>, { reauth = true } = {}): Promise<T> {
     try {

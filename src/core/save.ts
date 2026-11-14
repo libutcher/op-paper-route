@@ -82,7 +82,10 @@ export async function saveDocument(session: Session, request: SaveRequest): Prom
     ...(request.tags ? { tags: request.tags } : {}),
     ...(request.notes ? { notes: request.notes } : {}),
   };
-  const created = await session.run((client) => client.items.create(params));
+  // No automatic retry: if the session expires mid-create, the item may already
+  // exist, and retrying here would skip the duplicate check above. The caller
+  // gets SESSION_EXPIRED; the user's next attempt re-runs the whole save.
+  const created = await session.run((client) => client.items.create(params), { reauth: false });
 
   // 5. Read it back and compare. Any failure here deletes the item.
   let problem: PaperRouteError | null = null;

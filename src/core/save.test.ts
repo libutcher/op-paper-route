@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sdk from "@1password/sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fakeClient, type FakeClient } from "./fake-client.test-util.js";
 import { ALWAYS_FITS_BYTES } from "./limits.js";
 import { saveDocument } from "./save.js";
@@ -89,7 +89,7 @@ describe("saveDocument", () => {
   it("does not send undefined tags or notes", async () => {
     const { session, client } = setup();
     await saveDocument(session, { filePath: smallFile, vaultId: VAULT });
-    const params = (client.items.create as ReturnType<typeof import("vitest").vi.fn>).mock.calls[0]![0] as object;
+    const params = vi.mocked(client.items.create).mock.calls[0]![0] as object;
     expect(params).not.toHaveProperty("tags");
     expect(params).not.toHaveProperty("notes");
   });
@@ -207,20 +207,45 @@ describe("saveDocument", () => {
     expect(client.stored.size).toBe(0);
   });
 
-  it("recovers from a session expiry in the middle of a save", async () => {
-    const first = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
-    first.failNext("create", new sdk.DesktopSessionExpiredError("expired"));
-    const second = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
-    const clients = [first, second];
-    const session = new Session({
-      accountName: "Test",
-      integrationName: "tests",
-      integrationVersion: "0",
-      connect: async () => clients.shift()!,
+  it("does not retry create after a session expiry, and the next save reconnects", async () => {
+    const { session, client } = setup();
+    client.failNext("create", new sdk.DesktopSessionExpiredError("expired"));
+
+    await expect(saveDocument(session, { filePath: smallFile, vaultId: VAULT })).rejects.toMatchObject({
+      code: "SESSION_EXPIRED",
+    });
+    expect(client.items.create).toHaveBeenCalledTimes(1);
+    expect(session.isConnected).toBe(false);
+
+    // The user tries again: a fresh connection, and the save goes through.
+    await expect(saveDocument(session, { filePath: smallFile, vaultId: VAULT })).resolves.toMatchObject({ itemId: "item-1" });
+  });
+
+  it("never creates a second copy when a create succeeds but reports the session expired", async () => {
+    const { session, client } = setup();
+    const realCreate = client.items.create;
+    client.items.create = vi.fn(async (params: Parameters<typeof realCreate>[0]) => {
+      await realCreate(params); // the item lands in the vault...
+      throw new sdk.DesktopSessionExpiredError("expired"); // ...but the call reports expiry
     });
 
+    await expect(saveDocument(session, { filePath: smallFile, vaultId: VAULT })).rejects.toMatchObject({
+      code: "SESSION_EXPIRED",
+    });
+    expect(client.stored.size).toBe(1);
+
+    // Retrying finds the item that already landed instead of making another.
+    await expect(saveDocument(session, { filePath: smallFile, vaultId: VAULT })).rejects.toMatchObject({
+      code: "DUPLICATE_TITLE",
+    });
+    expect(client.stored.size).toBe(1);
+  });
+
+  it("still retries read-only steps after a session expiry", async () => {
+    const { session, client } = setup();
+    client.failNext("list", new sdk.DesktopSessionExpiredError("expired"));
+
     await expect(saveDocument(session, { filePath: smallFile, vaultId: VAULT })).resolves.toMatchObject({ itemId: "item-1" });
-    expect(first.stored.size).toBe(0);
-    expect(second.stored.size).toBe(1);
+    expect(client.items.list).toHaveBeenCalledTimes(2);
   });
 });
