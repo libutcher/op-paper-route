@@ -63,15 +63,15 @@ const MESSAGES: Record<Exclude<ErrorCode, "UNKNOWN">, string> = {
  *    (shared_lib_core.js, when the app or its dylib is missing)
  *  - "...Error { msg: Account not found, inner: None }" (observed in M0)
  *
- * UNCONFIRMED: the wording for a declined prompt and for a locked app. The
- * NOT_AUTHORIZED pattern is a guess until the M1 live probe records the real
- * strings; anything it misses falls through to UNKNOWN rather than being
- * mislabelled.
+ * NOT YET MAPPED: the wording for a declined prompt and for a locked app. Until
+ * a live probe records the exact strings these surface as UNKNOWN. A guessed
+ * pattern is worse than none: words like "denied" also appear in unrelated
+ * errors (e.g. a write to a read-only vault), which would tell the user to
+ * unlock 1Password when that isn't the problem.
  */
 const MESSAGE_PATTERNS: ReadonlyArray<readonly [RegExp, Exclude<ErrorCode, "UNKNOWN">]> = [
   [/desktop application not found|Native library is not available/i, "APP_NOT_FOUND"],
   [/Account not found/i, "ACCOUNT_NOT_FOUND"],
-  [/\b(denied|rejected|not authori[sz]ed|unauthori[sz]ed|locked)\b/i, "NOT_AUTHORIZED"],
 ];
 
 /** Wrap anything thrown by the SDK (or already a PaperRouteError) into a PaperRouteError. */

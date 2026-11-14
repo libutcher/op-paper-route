@@ -26,11 +26,12 @@ describe("fromSdkError", () => {
     expect(fromSdkError(new Error("Native library is not available.")).code).toBe("APP_NOT_FOUND");
   });
 
-  it("maps authorization wording to NOT_AUTHORIZED without over-matching", () => {
-    expect(fromSdkError(new Error("request denied by user")).code).toBe("NOT_AUTHORIZED");
-    expect(fromSdkError(new Error("account is locked")).code).toBe("NOT_AUTHORIZED");
-    // "blocked" contains "locked" but is not an authorization failure.
-    expect(fromSdkError(new Error("port blocked")).code).toBe("UNKNOWN");
+  it("does not guess NOT_AUTHORIZED from generic wording", () => {
+    // Until the real declined/locked strings are captured, none of these may be
+    // mislabelled as an approval problem.
+    for (const message of ["permission denied", "write access denied for vault", "request denied by user", "account is locked", "port blocked"]) {
+      expect(fromSdkError(new Error(message)).code, message).toBe("UNKNOWN");
+    }
   });
 
   it("falls back to UNKNOWN and keeps the original message and cause", () => {
