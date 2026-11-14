@@ -4,9 +4,10 @@ A small macOS utility for getting a document you just downloaded into a 1Passwor
 
 Built on the official [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js) with desktop-app authentication, so there are no tokens or service accounts: the 1Password app itself approves each session, and PaperRoute can reach every vault you can, including your Private vault.
 
-![PaperRoute connecting to 1Password, receiving a file from Finder, and saving it to a vault, in dark mode](docs/demo-dark.gif)
-
-*A scripted run of the real window against a stand-in backend (`npm run demo`), so nothing personal appears.*
+<p align="center">
+  <img src="docs/demo-dark.gif" width="440" alt="PaperRoute connecting to 1Password, receiving a file from Finder, and saving it to a vault, in dark mode">
+</p>
+<p align="center"><em>A scripted run of the real window against a stand-in backend (<code>npm run demo</code>), so nothing personal appears.</em></p>
 
 ## What's included
 
@@ -14,7 +15,6 @@ Built on the official [1Password JavaScript SDK](https://github.com/1Password/on
 - **A Finder Quick Action.** Right-click a file → **Quick Actions → Save to 1Password with PaperRoute**, and the window opens with that file loaded. Installed from the app's own menu.
 - **Other ways in:** drop a file on the menu-bar icon, or choose one with a file picker.
 - **Optional clean-up.** A checkbox moves the original to the Trash once the document is safely in 1Password.
-- **A command-line interface**, for scripts and Shortcuts.
 
 What PaperRoute never does: it stores no tokens or passwords, uses no service accounts, and never reads 1Password's own files. Every session is approved by you, in the 1Password app, the same way you unlock it.
 
@@ -22,7 +22,7 @@ What PaperRoute never does: it stores no tokens or passwords, uses no service ac
 
 - **macOS** on Apple silicon (an Intel build can be made from source).
 - **The 1Password desktop app**, with **Settings → Developer → Integrate with 1Password SDKs** turned on. PaperRoute talks to 1Password only through this.
-- **Node 20 or later**, only if you build from source or use the command-line interface.
+- **Node 20 or later**, only if you build from source.
 
 ## Installation
 
@@ -61,20 +61,6 @@ Tick **Move the original to the Trash after saving** to clean up as you go. The 
 
 Settings (the account name, the last vault and the Trash option) are kept in `~/Library/Application Support/paper-route/settings.json`. Nothing secret is stored there.
 
-### The command-line interface
-
-For scripts and Shortcuts. It runs from source, so it needs Node 20 or later and `npm install`.
-
-```sh
-export PAPER_ROUTE_ACCOUNT="<account name as shown in the 1Password sidebar>"
-
-npm run vaults                                   # list vaults with their ids
-npm run save -- ~/Downloads/receipt.pdf --vault "Personal Docs"
-npm run save -- scan.pdf --vault <vault-id> --title "Dentist, March" --tag receipts
-```
-
-The first call prompts for approval in the 1Password app. If two vaults share a name, `--vault` must be the id. A second document with the same title in the same vault is refused unless you pass `--allow-duplicate`.
-
 ## Development
 
 Needs Node 20 or later.
@@ -96,6 +82,20 @@ PAPER_ROUTE_LIVE=1 npm test   # also runs the live test against the real app (on
 
 The live test creates one small document in the vault named by `PAPER_ROUTE_TEST_VAULT` (default `PaperRouteTest`) and deletes it again.
 
+### Testing the core from the command line
+
+A small CLI exercises the core library (`src/core/`) against the real 1Password app without the window, which is useful when changing the save logic or chasing an SDK behaviour.
+
+```sh
+export PAPER_ROUTE_ACCOUNT="<account name as shown in the 1Password sidebar>"
+
+npm run vaults                                   # list vaults with their ids
+npm run save -- ~/Downloads/receipt.pdf --vault PaperRouteTest
+npm run save -- scan.pdf --vault <vault-id> --title "Dentist, March" --tag receipts
+```
+
+The first call prompts for approval in the 1Password app. If two vaults share a name, `--vault` must be the id. A second document with the same title in the same vault is refused unless you pass `--allow-duplicate`. Every failure prints as one line with its error code, the same codes the window switches on.
+
 If Electron starts and immediately exits with an error about `app` being undefined, `ELECTRON_RUN_AS_NODE` is set in your shell (VS Code's terminal sets it). `npm start` clears it; to run Electron by hand, use `env -u ELECTRON_RUN_AS_NODE npx electron .`. The packaged app ignores the variable (see Packaging).
 
 ### Layout
@@ -104,7 +104,7 @@ If Electron starts and immediately exits with an error about `app` being undefin
 - `src/app/` — the Electron main process. `main.ts` sets up the menu-bar icon, shortcut and window; `handlers.ts` implements each request from the window; `account-names.ts` decides which spellings of an account name to try; `handoff.ts` takes files from Finder, the menu-bar icon and other launches; `quick-action.ts` builds the Finder Quick Action's workflow; `preload.cts` is the only bridge into the sandboxed window. Everything but `main.ts` and the preload is free of Electron imports, so it can be tested.
 - `src/renderer/` — the window: a sandboxed page with no Node access.
 - `src/shared/` — types, the window ↔ main-process API, and `window-logic.ts`: the window's decisions (when to offer Try Again, when a 1Password prompt is likely, how titles are filled in), kept out of the DOM code so they can be tested.
-- `src/cli.ts` — the command-line interface, built on the core.
+- `src/cli.ts` — the testing CLI, built on the core.
 - `scripts/` — packaging (`package.mjs`, `make-dmg.mjs`), icon rendering, the development Quick Action installer, and the demo recorder (`demo/`).
 - `assets/`, `build/`, `docs/` — icon sources and outputs, the entitlements, and the demo.
 
