@@ -17,6 +17,9 @@ const DEFAULTS: Settings = { accountName: null, lastVaultId: null };
 export class SettingsStore {
   readonly #file: string;
   #cache: Settings | null = null;
+  /** Updates run one at a time, each starting from the result of the last. */
+  #queue: Promise<unknown> = Promise.resolve();
+  #writes = 0;
 
   constructor(file: string) {
     this.#file = file;
@@ -27,11 +30,19 @@ export class SettingsStore {
     return { ...this.#cache };
   }
 
-  async update(patch: Partial<Settings>): Promise<Settings> {
+  update(patch: Partial<Settings>): Promise<Settings> {
+    const run = this.#queue.then(() => this.#write(patch));
+    // Keep the queue going even if this update fails.
+    this.#queue = run.catch(() => {});
+    return run;
+  }
+
+  async #write(patch: Partial<Settings>): Promise<Settings> {
     const next = { ...(await this.get()), ...patch };
     await mkdir(dirname(this.#file), { recursive: true });
     // Write-then-rename so a crash mid-write can't leave a truncated file.
-    const tmp = `${this.#file}.tmp`;
+    // Each write gets its own temp name so no two writes share one.
+    const tmp = `${this.#file}.${process.pid}.${++this.#writes}.tmp`;
     await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
     await rename(tmp, this.#file);
     this.#cache = next;

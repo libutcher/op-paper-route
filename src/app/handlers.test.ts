@@ -44,6 +44,37 @@ describe("settings", () => {
     await writeFile(settingsFile, "{not json");
     await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({ accountName: null, lastVaultId: null });
   });
+
+  it("keeps both changes when two updates overlap", async () => {
+    const settings = new SettingsStore(settingsFile);
+
+    const [first, second] = await Promise.all([
+      settings.update({ accountName: "Butcher Family" }),
+      settings.update({ lastVaultId: "v-test" }),
+    ]);
+
+    expect(first).toEqual({ accountName: "Butcher Family", lastVaultId: null });
+    expect(second).toEqual({ accountName: "Butcher Family", lastVaultId: "v-test" });
+    // And on disk, read fresh.
+    await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({
+      accountName: "Butcher Family",
+      lastVaultId: "v-test",
+    });
+    // No temp files left behind.
+    const { readdir } = await import("node:fs/promises");
+    expect((await readdir(join(dir, "settings"))).filter((f) => f.endsWith(".tmp"))).toEqual([]);
+  });
+
+  it("keeps working after a failed update", async () => {
+    // A directory where the settings file should be makes the rename fail.
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(settingsFile, { recursive: true });
+    const settings = new SettingsStore(settingsFile);
+
+    await expect(settings.update({ accountName: "A" })).rejects.toThrow();
+    await rm(settingsFile, { recursive: true });
+    await expect(settings.update({ lastVaultId: "v" })).resolves.toMatchObject({ lastVaultId: "v" });
+  });
 });
 
 describe("handlers", () => {
