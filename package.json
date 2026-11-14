@@ -1,6 +1,6 @@
 {
   "name": "paper-route",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Save local documents into a 1Password vault with minimal friction",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json --noEmit",
