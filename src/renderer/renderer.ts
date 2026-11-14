@@ -46,6 +46,8 @@ const statusActions = $<HTMLDivElement>("status-actions");
 let filePath: string | null = null;
 let busy = false;
 let vaultsLoaded = false;
+/** The vault to preselect once vaults load: the one used last time. */
+let preferredVaultId: string | null = null;
 
 // ---------- status line ----------
 
@@ -154,6 +156,8 @@ accountView.addEventListener("submit", async (event) => {
     return;
   }
   vaultsLoaded = false;
+  // A different account means a new session, which 1Password will ask about.
+  lastAnsweredAt = null;
   showSaveView(result.value.lastVaultId);
 });
 
@@ -300,7 +304,21 @@ saveView.addEventListener("submit", (event) => {
   event.preventDefault();
   void save();
 });
-vaultSelect.addEventListener("change", updateSaveButton);
+vaultSelect.addEventListener("change", () => {
+  clearStalePrompt();
+  updateSaveButton();
+});
+titleInput.addEventListener("input", clearStalePrompt);
+
+/**
+ * Remove leftover action buttons (Save Anyway, Try Again). They were offered
+ * for one specific file, title and vault at one moment; once any of those
+ * changes, or the window has been away, acting on them would do something the
+ * user was never asked about.
+ */
+function clearStalePrompt(): void {
+  if (!busy && !statusActions.hidden) setStatus("");
+}
 
 // ---------- window ----------
 
@@ -309,10 +327,18 @@ document.addEventListener("keydown", (event) => {
 });
 
 api.onShown(() => {
-  if (!saveView.hidden) (filePath ? titleInput : drop).focus();
+  if (saveView.hidden) return;
+  (filePath ? titleInput : drop).focus();
+  if (busy) return;
+  // Start clean: no stale result or prompt from before the window was hidden.
+  setStatus(vaultsLoaded && !filePath ? "Ready." : "");
+  // If the vaults never loaded (the approval was denied, say), reopening the
+  // window is a natural moment to try again.
+  if (!vaultsLoaded) void loadVaults(preferredVaultId);
 });
 
 function showSaveView(lastVaultId: string | null): void {
+  preferredVaultId = lastVaultId;
   accountView.hidden = true;
   saveView.hidden = false;
   drop.focus();
