@@ -24,6 +24,12 @@ export interface Handlers {
   getState(): Promise<AppState>;
   setAccount(accountName: unknown): Promise<Result<AppState>>;
   setTrashAfterSave(on: unknown): Promise<Result<AppState>>;
+  /**
+   * Forget the saved account and last vault, and let go of the session. The
+   * caller restarts the app afterwards: 1Password's approval is per process
+   * and can't be revoked from inside it, so ending the process is what ends it.
+   */
+  signOut(): Promise<void>;
   listVaults(): Promise<Result<VaultSummary[]>>;
   save(args: unknown): Promise<Result<SaveOutcome>>;
 }
@@ -116,6 +122,12 @@ export function createHandlers(options: HandlerOptions): Handlers {
           { details: { typed } },
         );
       });
+    },
+
+    async signOut() {
+      session = null;
+      sessionAccount = null;
+      await settings.update({ accountName: null, lastVaultId: null });
     },
 
     async setTrashAfterSave(on) {

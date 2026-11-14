@@ -450,9 +450,6 @@ if (state.accountName) {
 // Files from Finder or the menu-bar icon. Listen first, then collect anything
 // that arrived while the page was loading (a Quick Action that started the
 // app), so nothing falls into the gap between the two.
-// From the menu-bar menu: change the account. The field is prefilled with the
-// current name.
-api.onShowSetup(() => showAccountView());
 api.onIncomingFile(offerFile);
 const early = await api.takeIncomingFile();
 if (early) offerFile(early);

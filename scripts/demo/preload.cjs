@@ -56,7 +56,6 @@ const api = {
   onIncomingFile: (listener) => {
     onIncoming = listener;
   },
-  onShowSetup: () => {},
 };
 
 ipcRenderer.on("demo:incoming", (_event, file) => onIncoming?.(file));

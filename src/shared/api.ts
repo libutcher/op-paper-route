@@ -78,8 +78,6 @@ export interface PaperRouteApi {
    */
   takeIncomingFile(): Promise<IncomingFile | null>;
   onIncomingFile(listener: (file: IncomingFile) => void): void;
-  /** Called when the user chooses "1Password Account…" from the menu-bar menu. */
-  onShowSetup(listener: () => void): void;
 }
 
 /** IPC channel names, shared so main and preload can't drift apart. */
@@ -94,5 +92,4 @@ export const CHANNELS = {
   takeIncomingFile: "paper-route:take-incoming-file",
   incomingFile: "paper-route:incoming-file",
   setTrashAfterSave: "paper-route:set-trash-after-save",
-  showSetup: "paper-route:show-setup",
 } as const;

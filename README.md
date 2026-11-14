@@ -36,7 +36,9 @@ To build the disk image yourself, see [Development](#development).
 
 PaperRoute asks which 1Password account your documents should go to. Open 1Password and copy the name at the very top of the sidebar, above your vaults, then enter it and press Continue. PaperRoute checks the name with 1Password straight away and tells you if it doesn't match. It's forgiving about capitals and apostrophe style, but otherwise the name must match exactly: there's no way for an app to list your 1Password accounts for you.
 
-Approve the request in 1Password. The approval is 1Password's to give and take away: it covers PaperRoute while it's running, and ends when 1Password locks or after ten minutes without use. After that, PaperRoute simply asks again next time. To switch accounts later, choose **1Password Account…** from the menu-bar icon.
+Approve the request in 1Password. The approval is 1Password's to give and take away: it covers PaperRoute while it's running, and ends when 1Password locks or after ten minutes without use. After that, PaperRoute simply asks again next time.
+
+To switch accounts, or to leave nothing behind on a shared Mac, choose **Sign Out…** from the menu-bar icon. PaperRoute forgets the account and restarts, which is what ends 1Password's approval (it belongs to the running process, and nothing inside the app can revoke it). You'll see the first-run screen next time. Nothing in 1Password is changed.
 
 ### Saving a document
 
