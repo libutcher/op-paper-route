@@ -32,14 +32,18 @@ let quitting = false;
 // is ready for them.
 const inbox = new Inbox((file) => win?.webContents.send(CHANNELS.incomingFile, file));
 
-/** Take the first real file among `candidates`, show the window, and hand the file to it. */
-async function receive(candidates: readonly string[], cwd: string): Promise<void> {
+/**
+ * Take the first real file among `candidates`, show the window, and hand the
+ * file to it. Returns false (and shows nothing) if there was no usable file.
+ */
+async function receive(candidates: readonly string[], cwd: string): Promise<boolean> {
   const file = await firstFile(candidates, cwd);
-  if (!file) return;
+  if (!file) return false;
   // Show first: the window resets its status line when shown, and messages to
   // it arrive in order, so the file (and any note about it) must come after.
   showWindow();
   inbox.deliver(file);
+  return true;
 }
 
 const isDefaultApp = process.defaultApp === true;
@@ -60,8 +64,11 @@ if (!app.requestSingleInstanceLock()) {
   // A second launch, e.g. from the Finder Quick Action, carries its file
   // paths on the command line.
   app.on("second-instance", (_event, argv, workingDirectory) => {
-    showWindow();
-    void receive(pathArguments(argv, { isDefaultApp }), workingDirectory);
+    // receive() shows the window when there's a file; show it here only when
+    // there isn't, so the window is shown (and told so) once, not twice.
+    void receive(pathArguments(argv, { isDefaultApp }), workingDirectory).then((found) => {
+      if (!found) showWindow();
+    });
   });
   app.whenReady().then(start).catch((err: unknown) => {
     dialog.showErrorBox("PaperRoute couldn't start", String(err));
