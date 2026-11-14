@@ -76,7 +76,7 @@ lap("authenticated");
 
 // 3. Find the target vault by title.
 const vaults = await client.vaults.list();
-lap(`listed ${vaults.length} vault(s): ${vaults.map((v) => v.title).join(", ")}`);
+lap(`listed ${vaults.length} vault(s)`);
 const vault = vaults.find((v) => v.title === vaultName);
 if (!vault) {
   console.error(`vault "${vaultName}" not found in account "${accountName}"`);
@@ -90,7 +90,9 @@ const created = await client.items.create({
   vaultId: vault.id,
   title,
   tags: ["paper-route", "spike"],
-  notes: `Uploaded by Paper Route spike from ${filePath}`,
+  // Deliberately no local path: it would expose the username and folder layout
+  // to anyone the vault is shared with.
+  notes: "Uploaded by Paper Route spike",
   document: { name: title, content },
 });
 lap(`created item ${created.id} "${created.title}" in "${vault.title}"`);
