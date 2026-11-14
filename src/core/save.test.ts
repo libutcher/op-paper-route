@@ -86,6 +86,15 @@ describe("saveDocument", () => {
     );
   });
 
+  it("hands the SDK a plain Uint8Array, which serializes as a byte array (a Buffer would not)", async () => {
+    const { session, client } = setup();
+    await saveDocument(session, { filePath: smallFile, vaultId: VAULT });
+
+    const content = vi.mocked(client.items.create).mock.calls[0]![0].document!.content;
+    expect(Object.getPrototypeOf(content)).toBe(Uint8Array.prototype);
+    expect(JSON.stringify({ content }, sdk.ReplacerFunc)).toBe(JSON.stringify({ content: Array.from(smallBytes) }));
+  });
+
   it("does not send undefined tags or notes", async () => {
     const { session, client } = setup();
     await saveDocument(session, { filePath: smallFile, vaultId: VAULT });

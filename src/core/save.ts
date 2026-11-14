@@ -69,7 +69,11 @@ export async function saveDocument(session: Session, request: SaveRequest): Prom
   //    changed after the stat.
   let content: Uint8Array;
   try {
-    content = new Uint8Array(await readFile(request.filePath));
+    const buffer = await readFile(request.filePath);
+    // A plain Uint8Array *view* of the same memory: no copy. It must not be the
+    // Buffer itself, because JSON.stringify calls Buffer.toJSON() before the
+    // SDK's replacer sees it and the bytes would be sent as {"type":"Buffer",...}.
+    content = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   } catch (err) {
     // Node refuses to read files over 2 GiB; that's a size problem, not an unreadable file.
     if ((err as NodeJS.ErrnoException).code === "ERR_FS_FILE_TOO_LARGE") throw tooLargeBySize(size, err);
@@ -121,7 +125,7 @@ export async function saveDocument(session: Session, request: SaveRequest): Prom
       // The SDK only revives non-empty byte arrays into a Uint8Array; an empty
       // file comes back as a plain []. Normalise before comparing.
       const roundTrip = raw instanceof Uint8Array ? raw : Uint8Array.from(raw as ArrayLike<number>);
-      if (!Buffer.from(roundTrip).equals(content)) {
+      if (Buffer.compare(roundTrip, content) !== 0) {
         problem = new PaperRouteError("VERIFY_FAILED", "The bytes read back from 1Password differ from the file");
       }
     }
