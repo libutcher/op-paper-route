@@ -4,6 +4,10 @@ A small macOS utility for getting a document you just downloaded into a 1Passwor
 
 Built on the official [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js) with desktop-app authentication, so there are no tokens or service accounts: the 1Password app itself approves each session, and the app can reach every vault you can, including your Private vault.
 
+![PaperRoute connecting to 1Password, receiving a file from Finder, and saving it to a vault, in dark mode](docs/demo-dark.gif)
+
+*A scripted run of the real window against a stand-in backend (`npm run demo`), so nothing personal appears.*
+
 ## Status
 
 Usable, and packaged as a Mac app. It isn't signed with an Apple Developer ID yet, so on a Mac other than the one it was built on, macOS asks you to allow it once (see [Installing](#installing)).

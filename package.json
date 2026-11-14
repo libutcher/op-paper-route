@@ -14,7 +14,8 @@
     "uninstall-quick-action": "node scripts/quick-action.mjs uninstall",
     "render-icons": "node scripts/render-icons.mjs",
     "package": "npm run build && node scripts/package.mjs",
-    "dmg": "npm run package && node scripts/make-dmg.mjs"
+    "dmg": "npm run package && node scripts/make-dmg.mjs",
+    "demo": "npm run build && env -u ELECTRON_RUN_AS_NODE electron scripts/demo/record.cjs"
   },
   "private": true,
   "type": "module",
