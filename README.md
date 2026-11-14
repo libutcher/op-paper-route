@@ -1,13 +1,12 @@
 # PaperRoute
 
-A small macOS utility for getting a document you just downloaded into a 1Password vault with as little friction as possible: one Touch ID, drop the file, done.
-
-Built on the official [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js) with desktop-app authentication, so there are no tokens or service accounts: the 1Password app itself approves each session, and PaperRoute can reach every vault you can, including your Private vault.
-
 <p align="center">
   <img src="docs/demo-dark.gif" width="350" alt="PaperRoute connecting to 1Password, receiving a file from Finder, and saving it to a vault, in dark mode">
 </p>
-<p align="center"><em>A scripted run of the real window against a stand-in backend (<code>npm run demo</code>), so nothing personal appears.</em></p>
+
+A small macOS utility for getting a document you just downloaded into a 1Password vault with as little friction as possible: one Touch ID, drop the file, done.
+
+Built on the official [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js) with desktop-app authentication, so there are no tokens or service accounts: the 1Password app itself approves each session, and PaperRoute can reach every vault you can, including your Private vault.
 
 ## What's included
 
