@@ -235,6 +235,10 @@ drop.addEventListener("keydown", (event) => {
   }
 });
 clearButton.addEventListener("click", () => {
+  // The file can't be removed while it's being saved (the button is disabled
+  // then too): that would bring up the waiting file mid-save, and the save
+  // finishing would then clear it.
+  if (saving) return;
   // Removing the current file brings up the one waiting behind it, if any.
   const next = incoming.take();
   if (next) {
@@ -249,6 +253,7 @@ clearButton.addEventListener("click", () => {
 
 function updateSaveButton(): void {
   saveButton.disabled = busy || !filePath || !vaultsLoaded || !vaultSelect.value;
+  clearButton.disabled = saving;
 }
 
 async function save(allowDuplicate = false): Promise<void> {
@@ -261,6 +266,7 @@ async function save(allowDuplicate = false): Promise<void> {
     result = await withPromptHint("Saving…", () => api.save(request));
   } finally {
     saving = false;
+    updateSaveButton();
   }
   if (result.ok) {
     const saved = savedMessage(result.value.title, vaultName, result.value.original);
