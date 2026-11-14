@@ -65,45 +65,92 @@ if (encoded + MESSAGE_HEADROOM > SDK_MESSAGE_LIMIT) {
 }
 lap(`read ${path.basename(filePath)} (${content.byteLength} bytes, ${encoded} encoded)`);
 
-// 2. Authenticate via the desktop app. Expect a Touch ID prompt here.
-console.log(`connecting to 1Password as "${accountName}" — approve the prompt in the 1Password app`);
-const client = await sdk.createClient({
-  auth: new sdk.DesktopAuth(accountName),
-  integrationName: "Paper Route (spike)",
-  integrationVersion: "v0.0.0",
-});
-lap("authenticated");
-
-// 3. Find the target vault by title.
-const vaults = await client.vaults.list();
-lap(`listed ${vaults.length} vault(s)`);
-const vault = vaults.find((v) => v.title === vaultName);
-if (!vault) {
-  console.error(`vault "${vaultName}" not found in account "${accountName}"`);
+// Print a one-line error instead of an unhandled-rejection stack trace.
+function fail(message, err) {
+  console.error(err ? `${message}: ${err.message ?? err}` : message);
   process.exit(1);
 }
 
-// 4. Create the Document item.
+// 2. Authenticate via the desktop app. Expect a Touch ID prompt here.
+console.log(`connecting to 1Password as "${accountName}" — approve the prompt in the 1Password app`);
+let client;
+try {
+  client = await sdk.createClient({
+    auth: new sdk.DesktopAuth(accountName),
+    integrationName: "Paper Route (spike)",
+    integrationVersion: "v0.0.0",
+  });
+} catch (err) {
+  fail(`could not connect to 1Password as "${accountName}"`, err);
+}
+lap("authenticated");
+
+// 3. Find the target vault by title.
+let vault;
+try {
+  const vaults = await client.vaults.list();
+  lap(`listed ${vaults.length} vault(s)`);
+  vault = vaults.find((v) => v.title === vaultName);
+} catch (err) {
+  fail("could not list vaults", err);
+}
+if (!vault) fail(`vault "${vaultName}" not found in account "${accountName}"`);
+
+// 4. Refuse to create a second item with the same title, so reruns don't pile up
+//    copies in the vault.
 const title = path.basename(filePath);
-const created = await client.items.create({
-  category: sdk.ItemCategory.Document,
-  vaultId: vault.id,
-  title,
-  tags: ["paper-route", "spike"],
-  // Deliberately no local path: it would expose the username and folder layout
-  // to anyone the vault is shared with.
-  notes: "Uploaded by Paper Route spike",
-  document: { name: title, content },
-});
+try {
+  const existing = (await client.items.list(vault.id)).find(
+    (i) => i.category === sdk.ItemCategory.Document && i.title === title,
+  );
+  if (existing) {
+    fail(`"${title}" already exists in "${vault.title}" (item ${existing.id}); delete or rename it first`);
+  }
+} catch (err) {
+  fail(`could not list items in "${vault.title}"`, err);
+}
+
+// 5. Create the Document item.
+let created;
+try {
+  created = await client.items.create({
+    category: sdk.ItemCategory.Document,
+    vaultId: vault.id,
+    title,
+    tags: ["paper-route", "spike"],
+    // Deliberately no local path: it would expose the username and folder layout
+    // to anyone the vault is shared with.
+    notes: "Uploaded by Paper Route spike",
+    document: { name: title, content },
+  });
+} catch (err) {
+  fail(`could not create "${title}" in "${vault.title}"`, err);
+}
 lap(`created item ${created.id} "${created.title}" in "${vault.title}"`);
 
-// 5. Read it back and verify the bytes match.
-// items.create already returns the document's FileAttributes, so no items.get.
-// The SDK only revives non-empty byte arrays into a Uint8Array; a zero-byte file
-// comes back as a plain [] with no byteLength. Normalise before comparing.
-const raw = await client.items.files.read(vault.id, created.id, created.document);
-const roundTrip = raw instanceof Uint8Array ? raw : Uint8Array.from(raw);
-const same = Buffer.from(roundTrip).equals(content);
-lap(`read back ${roundTrip.byteLength} bytes — ${same ? "MATCH" : "MISMATCH"}`);
+// 6. Read it back and verify the bytes match. If the read fails or the bytes
+//    differ, delete the item so a failed run leaves nothing behind.
+let problem;
+try {
+  // items.create already returns the document's FileAttributes, so no items.get.
+  // The SDK only revives non-empty byte arrays into a Uint8Array; a zero-byte file
+  // comes back as a plain [] with no byteLength. Normalise before comparing.
+  const raw = await client.items.files.read(vault.id, created.id, created.document);
+  const roundTrip = raw instanceof Uint8Array ? raw : Uint8Array.from(raw);
+  const same = Buffer.from(roundTrip).equals(content);
+  lap(`read back ${roundTrip.byteLength} bytes — ${same ? "MATCH" : "MISMATCH"}`);
+  if (!same) problem = "read-back bytes did not match the file";
+} catch (err) {
+  problem = `could not read the item back: ${err.message ?? err}`;
+}
 
-process.exit(same ? 0 : 1);
+if (problem) {
+  try {
+    await client.items.delete(vault.id, created.id);
+    fail(`${problem}; deleted item ${created.id}`);
+  } catch (err) {
+    fail(`${problem}; also failed to delete item ${created.id}, remove it manually`, err);
+  }
+}
+
+process.exit(0);
