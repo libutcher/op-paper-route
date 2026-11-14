@@ -60,6 +60,14 @@ describe("firstFile", () => {
     });
   });
 
+  it("keeps the selection order when many files are checked at once", async () => {
+    const names = Array.from({ length: 50 }, (_, i) => `many-${String(i).padStart(2, "0")}.pdf`);
+    await Promise.all(names.map((name) => writeFile(join(dir, name), name)));
+    const candidates = [join(dir, "missing.pdf"), ...names.map((name) => join(dir, name)).reverse()];
+
+    await expect(firstFile(candidates, "/")).resolves.toEqual({ path: join(dir, "many-49.pdf"), othersIgnored: 49 });
+  });
+
   it("returns null when nothing usable was passed", async () => {
     await expect(firstFile([], dir)).resolves.toBeNull();
     await expect(firstFile([join(dir, "folder")], dir)).resolves.toBeNull();

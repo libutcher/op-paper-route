@@ -27,16 +27,20 @@ export function pathArguments(argv: readonly string[], { isDefaultApp }: { isDef
  * they can't be saved, and Finder can pass a folder to a Quick Action.
  */
 export async function firstFile(candidates: readonly string[], cwd: string): Promise<IncomingFile | null> {
-  const files: string[] = [];
-  for (const candidate of candidates) {
-    const path = isAbsolute(candidate) ? candidate : resolve(cwd, candidate);
-    try {
-      if ((await stat(path)).isFile()) files.push(path);
-    } catch {
-      // Missing or unreadable: not something we can save.
-    }
-  }
-  const [first, ...rest] = files;
+  // Checked in parallel: a large Finder selection, perhaps on a network
+  // share, shouldn't hold the window up for one round-trip per file.
+  const checked = await Promise.all(
+    candidates.map(async (candidate) => {
+      const path = isAbsolute(candidate) ? candidate : resolve(cwd, candidate);
+      try {
+        return (await stat(path)).isFile() ? path : null;
+      } catch {
+        return null; // Missing or unreadable: not something we can save.
+      }
+    }),
+  );
+  // Promise.all keeps the order, so "first" is still the first one selected.
+  const [first, ...rest] = checked.filter((path): path is string => path !== null);
   return first ? { path: first, othersIgnored: rest.length } : null;
 }
 
