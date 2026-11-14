@@ -11,7 +11,8 @@
     "build": "rm -rf dist && tsc -p tsconfig.renderer.json && tsc -p tsconfig.build.json && cp src/renderer/index.html src/renderer/styles.css dist/renderer/",
     "start": "npm run build && env -u ELECTRON_RUN_AS_NODE electron .",
     "install-quick-action": "npm run build && node scripts/quick-action.mjs install",
-    "uninstall-quick-action": "node scripts/quick-action.mjs uninstall"
+    "uninstall-quick-action": "node scripts/quick-action.mjs uninstall",
+    "render-icons": "node scripts/render-icons.mjs"
   },
   "private": true,
   "type": "module",

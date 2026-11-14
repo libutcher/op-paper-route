@@ -48,6 +48,12 @@ async function receive(candidates: readonly string[], cwd: string): Promise<bool
 
 const isDefaultApp = process.defaultApp === true;
 
+// Development only: PAPER_ROUTE_USER_DATA=<folder> runs with separate settings,
+// e.g. to see the first-run screen without losing your own. Only honoured when
+// running unpackaged. Set before the single-instance lock, which is per folder.
+const devUserData = process.env["PAPER_ROUTE_USER_DATA"];
+if (isDefaultApp && devUserData) app.setPath("userData", devUserData);
+
 // macOS "open with" (a file dropped on the app icon, or opened with it from
 // Finder) only fires for a packaged app; wired now so M4 needs no app changes.
 // It can arrive before the app is ready, so it's registered first.
@@ -132,7 +138,7 @@ async function start(): Promise<void> {
 function createWindow(): void {
   win = new BrowserWindow({
     width: 440,
-    height: 450,
+    height: 480,
     show: false,
     resizable: false,
     minimizable: false,
@@ -195,8 +201,13 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  tray = new Tray(nativeImage.createEmpty());
-  tray.setTitle("📄");
+  // A template image: macOS recolours it for light and dark menu bars, and
+  // picks trayTemplate@2x.png on Retina displays.
+  const icon = nativeImage.createFromPath(join(here, "../../assets/trayTemplate.png"));
+  icon.setTemplateImage(true);
+  tray = new Tray(icon);
+  // Fall back to text if the icon couldn't be loaded, so the app is never unreachable.
+  if (icon.isEmpty()) tray.setTitle("PaperRoute");
   tray.setToolTip(`PaperRoute — press ${HOTKEY_WORDS}, or drop a file here`);
   tray.on("drop-files", (_event, files) => void receive(files, "/"));
   tray.setContextMenu(

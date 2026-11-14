@@ -25,11 +25,11 @@ npm install
 npm start
 ```
 
-PaperRoute lives in the menu bar as a 📄 icon, with no Dock icon. Press **Control-Option-P** (or click the icon) to open its window:
+PaperRoute lives in the menu bar as a small paper-plane icon, with no Dock icon. Press **Control-Option-P** (or click the icon) to open its window:
 
-1. The first time, enter your 1Password account name, as shown at the top of the 1Password sidebar.
+1. The first time, enter your 1Password account name: open 1Password and copy the name at the very top of the sidebar, above your vaults. PaperRoute checks it with 1Password straight away and tells you if it doesn't match. It's forgiving about capitals and apostrophe style, but otherwise the name must match exactly; there's no way for an app to list your 1Password accounts for you.
 2. Approve the request in 1Password. Approval lasts until 1Password locks or ten minutes pass without use.
-3. Give it a document: drop it on the window, drop it on the 📄 icon, choose one, or use the Finder Quick Action below. The title fills in from the file name and the last vault you used is already selected.
+3. Give it a document: drop it on the window, drop it on the menu-bar icon, choose one, or use the Finder Quick Action below. The title fills in from the file name and the last vault you used is already selected.
 4. Press **Return**. **Esc** hides the window.
 
 If a document with the same title is already in the vault, PaperRoute asks before saving another. If you hand it a file while a save is in progress, that file waits and loads when the save finishes. Saved documents are tagged `paper-route`.
@@ -71,6 +71,8 @@ If two vaults share a name, `--vault` must be the id. A second document with the
 npm test               # unit tests against an in-memory fake; never prompts
 npm run typecheck
 npm run build          # compile to dist/ (npm start does this too)
+npm run render-icons   # re-render the menu-bar icon PNGs from assets/tray-icon.svg
+PAPER_ROUTE_USER_DATA=/tmp/pr-test npm start   # run with separate settings, e.g. to see the first-run screen
 PAPER_ROUTE_LIVE=1 npm test   # also runs the live test against the real app (one prompt)
 ```
 

@@ -102,6 +102,83 @@ describe("handlers", () => {
     }
   });
 
+  describe("checking the account name", () => {
+    /** A connect() that knows exactly one account name, like the real SDK: exact match only. */
+    function onlyAccount(realName: string, outcome?: Error) {
+      const client = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
+      const connect = vi.fn<Connect>(async ({ accountName }) => {
+        if (accountName !== realName) {
+          throw new Error("An error occurred when processing SDK request: Error { msg: Account not found, inner: None }");
+        }
+        if (outcome) throw outcome;
+        return client;
+      });
+      const settings = new SettingsStore(settingsFile);
+      const handlers = createHandlers({ settings, integrationName: "t", integrationVersion: "0", connect, trash: vi.fn() });
+      return { handlers, settings, connect };
+    }
+
+    it("saves a name that connects, exactly as typed", async () => {
+      const { handlers, connect } = onlyAccount("Example Family");
+      await expect(handlers.setAccount("Example Family")).resolves.toMatchObject({
+        ok: true,
+        value: { accountName: "Example Family" },
+      });
+      expect(connect).toHaveBeenCalledTimes(1);
+    });
+
+    it("finds the account when only the capitals were wrong, and saves the name that worked", async () => {
+      const { handlers, settings } = onlyAccount("Example Family");
+      await expect(handlers.setAccount("  example family ")).resolves.toMatchObject({
+        ok: true,
+        value: { accountName: "Example Family" },
+      });
+      await expect(settings.get()).resolves.toMatchObject({ accountName: "Example Family" });
+    });
+
+    it("finds the account when the apostrophe style differs", async () => {
+      const { handlers } = onlyAccount("Lucy’s Family");
+      await expect(handlers.setAccount("Lucy's Family")).resolves.toMatchObject({
+        ok: true,
+        value: { accountName: "Lucy’s Family" },
+      });
+    });
+
+    it("keeps the session it checked with, so loading vaults doesn't ask for approval again", async () => {
+      const { handlers, connect } = onlyAccount("Example Family");
+      await handlers.setAccount("example family");
+      const attempts = connect.mock.calls.length;
+
+      await expect(handlers.listVaults()).resolves.toMatchObject({ ok: true });
+      expect(connect).toHaveBeenCalledTimes(attempts);
+    });
+
+    it("refuses a name that doesn't match, explains why, and saves nothing", async () => {
+      const { handlers, settings } = onlyAccount("Example Family");
+      await settings.update({ accountName: "Previous Account" });
+
+      const result = await handlers.setAccount("Exampel Family");
+
+      expect(result).toMatchObject({ ok: false, error: { code: "ACCOUNT_NOT_FOUND", details: { typed: "Exampel Family" } } });
+      expect(result.ok ? "" : result.error.message).toContain("including capital letters");
+      await expect(settings.get()).resolves.toMatchObject({ accountName: "Previous Account" });
+    });
+
+    it("stops at the first real problem instead of trying other spellings", async () => {
+      const denied = new Error(
+        "An error occurred when processing SDK request: Error { msg: Denied authorization for SDK client, inner: None }",
+      );
+      const { handlers, settings, connect } = onlyAccount("Example Family", denied);
+
+      await expect(handlers.setAccount("Example Family")).resolves.toMatchObject({
+        ok: false,
+        error: { code: "NOT_AUTHORIZED" },
+      });
+      expect(connect).toHaveBeenCalledTimes(1);
+      await expect(settings.get()).resolves.toMatchObject({ accountName: null });
+    });
+  });
+
   it("stores a trimmed account name and lists vaults with it", async () => {
     const { handlers, connect } = setup();
     await expect(handlers.setAccount("  Example Family ")).resolves.toMatchObject({
@@ -187,6 +264,7 @@ describe("handlers", () => {
   it("validates save arguments from the window before doing anything", async () => {
     const { handlers, connect } = setup();
     await handlers.setAccount("Example Family");
+    connect.mockClear(); // setting the account connects to check it; that's not under test here
     const bad: unknown[] = [
       null,
       "receipt.pdf",

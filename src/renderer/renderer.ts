@@ -6,7 +6,7 @@
  * is filled in, the last vault is already selected, press Return.
  */
 
-import type { IncomingFile, PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
+import type { ApiError, IncomingFile, PaperRouteApi, Result, VaultSummary } from "../shared/api.js";
 import {
   ApprovalTracker,
   IncomingQueue,
@@ -39,7 +39,8 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 const accountView = $<HTMLFormElement>("account-view");
 const accountInput = $<HTMLInputElement>("account-name");
-const accountError = $<HTMLParagraphElement>("account-error");
+const accountStatus = $<HTMLParagraphElement>("account-status");
+const accountContinue = $<HTMLButtonElement>("account-continue");
 
 const saveView = $<HTMLFormElement>("save-view");
 const drop = $<HTMLDivElement>("drop");
@@ -66,7 +67,9 @@ let preferredVaultId: string | null = null;
 
 // ---------- status line ----------
 
-type Tone = "info" | "ok" | "waiting" | "error";
+/** "working" is a call in progress; it and "waiting", "ok" and "error" each have an animated icon. */
+type Tone = "info" | "working" | "ok" | "waiting" | "error";
+const statusText = $<HTMLSpanElement>("status-text");
 
 /**
  * Whether the window is on screen, as far as this page knows: false until
@@ -88,8 +91,13 @@ let statusUnseen = false;
 
 function setStatus(text: string, tone: Tone = "info", actions: Array<{ label: string; run: () => void }> = []): void {
   statusUnseen = !onScreen && text !== "";
-  statusEl.textContent = text;
-  statusEl.className = `status ${tone === "info" ? "" : tone}`;
+  statusText.textContent = text;
+  // Remove the tone, force a reflow, then set it: this restarts the icon's
+  // animation (e.g. the error shake) even when the tone hasn't changed.
+  statusEl.className = "status";
+  void statusEl.offsetWidth;
+  // An empty status shows no icon, whatever the tone.
+  statusEl.className = text && tone !== "info" ? `status ${tone}` : "status";
   statusActions.replaceChildren(
     ...actions.map(({ label, run }) => {
       const button = document.createElement("button");
@@ -110,7 +118,7 @@ function setStatus(text: string, tone: Tone = "info", actions: Array<{ label: st
 async function withPromptHint<T>(working: string, call: () => Promise<Result<T>>): Promise<Result<T>> {
   busy = true;
   updateSaveButton();
-  setStatus(working, "info");
+  setStatus(working, "working");
   const hint = setTimeout(() => {
     const { text, tone } = slowCallMessage(working, approval.promptLikely());
     setStatus(text, tone);
@@ -128,26 +136,63 @@ async function withPromptHint<T>(working: string, call: () => Promise<Result<T>>
 
 // ---------- account ----------
 
+function setAccountStatus(text: string, tone: "working" | "error" | "" = ""): void {
+  accountStatus.textContent = text;
+  accountStatus.className = tone ? `status ${tone}` : "status";
+}
+
 function showAccountView(error?: string): void {
   saveView.hidden = true;
   accountView.hidden = false;
-  accountError.textContent = error ?? "";
+  setAccountStatus(error ?? "", error ? "error" : "");
   accountInput.focus();
   accountInput.select();
 }
 
+let checkingAccount = false;
 accountView.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const result = await api.setAccount(accountInput.value);
-  if (!result.ok) {
-    accountError.textContent = result.error.message;
-    return;
-  }
-  vaultsLoaded = false;
+  if (checkingAccount) return;
+  checkingAccount = true;
+  accountContinue.disabled = true;
+  setAccountStatus("Checking with 1Password… If it asks you to approve, approve it there.", "working");
   // A different account means a new session, which 1Password will ask about.
   approval.reset();
+  const typed = accountInput.value.trim();
+  let result;
+  try {
+    result = await api.setAccount(accountInput.value);
+  } finally {
+    checkingAccount = false;
+    accountContinue.disabled = false;
+  }
+  if (!result.ok) {
+    approval.note(result);
+    setAccountStatus(accountErrorMessage(result.error), "error");
+    accountInput.focus();
+    accountInput.select();
+    return;
+  }
+  approval.note(result);
+  vaultsLoaded = false;
   showSaveView(result.value.lastVaultId);
+  // If the name only matched with different capitals or quotes, say which one
+  // was used, so the user isn't left wondering.
+  const used = result.value.accountName;
+  if (used && used !== typed) setStatus(`Using your account “${used}”.`, "ok");
 });
+
+function accountErrorMessage(error: ApiError): string {
+  switch (error.code) {
+    case "ACCOUNT_NOT_FOUND":
+      // The handler's message names what was typed and explains the exact-match rule.
+      return error.message;
+    case "NOT_AUTHORIZED":
+      return "1Password didn't approve the request. Press Continue to try again.";
+    default:
+      return describeError(error);
+  }
+}
 
 // ---------- vaults ----------
 
@@ -156,7 +201,11 @@ async function loadVaults(preferredId: string | null): Promise<void> {
   const result = await withPromptHint("Connecting to 1Password…", () => api.listVaults());
   if (!result.ok) {
     if (result.error.code === "ACCOUNT_NOT_FOUND") {
-      showAccountView(`No 1Password account called “${accountInput.value || "that"}” is signed in.`);
+      // The saved account no longer matches (renamed, or signed out of 1Password).
+      showAccountView(
+        `PaperRoute can't find the 1Password account “${accountInput.value || "you chose"}” any more. ` +
+          "Check its name at the top of the 1Password sidebar and enter it again.",
+      );
       return;
     }
     vaultSelect.replaceChildren(new Option("No vaults loaded"));
