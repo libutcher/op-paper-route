@@ -4,7 +4,7 @@ import { join } from "node:path";
 import sdk from "@1password/sdk";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fakeClient, type FakeClient } from "./fake-client.test-util.js";
-import { ALWAYS_FITS_BYTES, NEVER_FITS_BYTES } from "./limits.js";
+import { ALWAYS_FITS_BYTES, MAX_ENCODED_BYTES, NEVER_FITS_BYTES } from "./limits.js";
 import { saveDocument } from "./save.js";
 import { Session } from "./session.js";
 
@@ -145,6 +145,28 @@ describe("saveDocument", () => {
     expect(performance.now() - started).toBeLessThan(500);
     expect(session.isConnected).toBe(false);
     expect(client.items.create).not.toHaveBeenCalled();
+  });
+
+  it("counts notes against the limit, so a file near the limit with long notes is refused before any prompt", async () => {
+    // All zeros encode to 2n + 1; pick n so the file alone fits with ~100 KB spare.
+    const n = Math.floor((MAX_ENCODED_BYTES - 100 * 1024) / 2);
+    const nearLimit = join(dir, "near-limit.bin");
+    await writeFile(nearLimit, new Uint8Array(n));
+
+    const withoutNotes = setup();
+    await expect(saveDocument(withoutNotes.session, { filePath: nearLimit, vaultId: VAULT })).resolves.toMatchObject({
+      bytes: n,
+    });
+
+    const withNotes = setup();
+    const err = await saveDocument(withNotes.session, {
+      filePath: nearLimit,
+      vaultId: VAULT,
+      notes: "x".repeat(200 * 1024),
+    }).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "FILE_TOO_LARGE" });
+    expect(withNotes.session.isConnected).toBe(false);
+    expect(withNotes.client.items.create).not.toHaveBeenCalled();
   });
 
   it("still reads and checks exactly when the size alone can't decide", async () => {

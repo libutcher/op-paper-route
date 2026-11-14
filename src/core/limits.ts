@@ -14,7 +14,10 @@
 /** Hard limit on a serialized SDK message, in bytes. */
 export const SDK_MESSAGE_LIMIT = 50 * 1024 * 1024;
 
-/** Space reserved for the rest of the message: title, notes, tags, JSON keys, envelope. */
+/**
+ * Space reserved for the fixed parts of the message: JSON keys, ids and the
+ * invocation envelope. User-supplied fields are measured separately; see checkFits.
+ */
 export const MESSAGE_HEADROOM = 64 * 1024;
 
 /** Largest encoded file payload that fits inside one message. */
@@ -51,10 +54,21 @@ export type FitCheck =
   | { fits: true; encoded: number; limit: number }
   | { fits: false; encoded: number; limit: number };
 
-/** Decide whether these exact bytes fit in one SDK message. */
-export function checkFits(bytes: Uint8Array): FitCheck {
+/**
+ * Decide whether these exact bytes fit in one SDK message alongside
+ * `metadataBytes` of other user-supplied content (title, notes, tags), which
+ * is unbounded and so can't come out of the fixed headroom. `limit` is the
+ * space left for the file once the metadata is accounted for.
+ */
+export function checkFits(bytes: Uint8Array, metadataBytes = 0): FitCheck {
   const encoded = encodedSize(bytes);
-  return { fits: encoded <= MAX_ENCODED_BYTES, encoded, limit: MAX_ENCODED_BYTES };
+  const limit = MAX_ENCODED_BYTES - metadataBytes;
+  return { fits: encoded <= limit, encoded, limit };
+}
+
+/** UTF-8 length of the user-supplied fields as they'll appear in the serialized message. */
+export function metadataSize(fields: Record<string, string | string[] | undefined>): number {
+  return Buffer.byteLength(JSON.stringify(fields), "utf8");
 }
 
 /**

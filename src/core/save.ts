@@ -13,7 +13,7 @@ import { basename } from "node:path";
 import sdk from "@1password/sdk";
 import type { ItemCreateParams } from "@1password/sdk";
 import { PaperRouteError, fromSdkError, messageFor } from "./errors.js";
-import { MAX_ENCODED_BYTES, NEVER_FITS_BYTES, checkFits, sizeHint } from "./limits.js";
+import { MAX_ENCODED_BYTES, NEVER_FITS_BYTES, checkFits, metadataSize, sizeHint } from "./limits.js";
 import type { Session } from "./session.js";
 
 export interface SaveRequest {
@@ -77,7 +77,8 @@ export async function saveDocument(session: Session, request: SaveRequest): Prom
   }
 
   // 3. Will these exact bytes fit in one SDK message? Decided before any prompt.
-  const fit = checkFits(content);
+  const metadata = metadataSize({ title, name: fileName, notes: request.notes, tags: request.tags });
+  const fit = checkFits(content, metadata);
   if (!fit.fits) {
     throw new PaperRouteError("FILE_TOO_LARGE", `${messageFor("FILE_TOO_LARGE")}: ${fileName}`, {
       details: { fileName, bytes: content.byteLength, encoded: fit.encoded, limit: fit.limit },

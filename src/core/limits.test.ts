@@ -6,6 +6,7 @@ import {
   NEVER_FITS_BYTES,
   checkFits,
   encodedSize,
+  metadataSize,
   sizeHint,
 } from "./limits.js";
 
@@ -55,6 +56,29 @@ describe("checkFits", () => {
     const ceilingMB = MAX_ENCODED_BYTES / ratio / 1024 / 1024;
     expect(ceilingMB).toBeGreaterThan(13.5);
     expect(ceilingMB).toBeLessThan(14.5);
+  });
+});
+
+describe("checkFits with metadata", () => {
+  it("takes the metadata out of the space left for the file", () => {
+    const n = Math.floor((MAX_ENCODED_BYTES - 1) / 2); // all zeros: encoded = 2n + 1
+    const file = new Uint8Array(n);
+    const slack = MAX_ENCODED_BYTES - (2 * n + 1);
+
+    expect(checkFits(file, slack)).toMatchObject({ fits: true, limit: 2 * n + 1 });
+    expect(checkFits(file, slack + 1)).toMatchObject({ fits: false, limit: 2 * n });
+  });
+});
+
+describe("metadataSize", () => {
+  it("is the UTF-8 length of the JSON, counting multi-byte characters and escapes", () => {
+    const fields = { title: "Café \"receipt\"", notes: "line one\nline two", tags: ["a", "ü"] };
+    expect(metadataSize(fields)).toBe(Buffer.byteLength(JSON.stringify(fields), "utf8"));
+    expect(metadataSize({ title: "é" })).toBe('{"title":"é"}'.length + 1);
+  });
+
+  it("ignores absent fields", () => {
+    expect(metadataSize({ title: "x", notes: undefined })).toBe('{"title":"x"}'.length);
   });
 });
 
