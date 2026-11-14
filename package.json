@@ -24,6 +24,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@electron/fuses": "1.8.0",
     "@electron/packager": "18.4.4",
     "@types/node": "20.19.43",
     "electron": "45.3.2",

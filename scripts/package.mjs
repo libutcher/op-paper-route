@@ -20,6 +20,7 @@ import { arch } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import packager from "@electron/packager";
+import { FuseV1Options, FuseVersion, flipFuses } from "@electron/fuses";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(join(REPO, "package.json"), "utf8"));
@@ -61,6 +62,30 @@ const [appDir] = await packager({
 });
 
 const app = join(appDir, "PaperRoute.app");
+
+// Fuses are switches compiled into the Electron binary. Flipped here, before
+// signing, so the shipped app can't be repurposed: without these, anyone (or
+// any malware) could run arbitrary code *as PaperRoute* by setting an
+// environment variable or a command-line flag, and that code would inherit
+// whatever the user had granted PaperRoute.
+await flipFuses(join(app, "Contents", "MacOS", "PaperRoute"), {
+  version: FuseVersion.V1,
+  // ELECTRON_RUN_AS_NODE: run as plain Node instead of as PaperRoute.
+  [FuseV1Options.RunAsNode]: false,
+  // NODE_OPTIONS: e.g. --require some-script.js before the app's own code.
+  [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+  // --inspect and friends: attach a debugger to the main process.
+  [FuseV1Options.EnableNodeCliInspectArguments]: false,
+  // Load the app only from app.asar, and refuse an app.asar whose hash doesn't
+  // match the one recorded in Info.plist (the packager records it).
+  [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+  [FuseV1Options.OnlyLoadAppFromAsar]: true,
+  // Encrypt cookies on disk. PaperRoute stores none, but it costs nothing.
+  [FuseV1Options.EnableCookieEncryption]: true,
+  // GrantFileProtocolExtraPrivileges is left at its default (on): the window
+  // is a file:// page that loads ES modules, which relies on it.
+});
+
 const sign = (...args) => execFileSync("codesign", args, { stdio: "inherit" });
 
 // --deep signs every helper and framework inside with the same ad hoc
