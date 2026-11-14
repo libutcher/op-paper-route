@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "description": "Save local documents into a 1Password vault with minimal friction",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "vaults": "tsx src/cli.ts vaults",
-    "save": "tsx src/cli.ts save"
+    "save": "tsx src/cli.ts save",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.renderer.json && cp src/renderer/index.html src/renderer/styles.css dist/renderer/",
+    "start": "npm run build && env -u ELECTRON_RUN_AS_NODE electron ."
   },
   "private": true,
   "type": "module",
@@ -23,5 +25,6 @@
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "4.1.12"
-  }
+  },
+  "main": "dist/app/main.js"
 }

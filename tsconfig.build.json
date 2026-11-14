@@ -1,0 +1,12 @@
+{
+  // Emits the Node side of the app (core, main process, preload) to dist/.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true
+  },
+  "include": ["src/core/**/*.ts", "src/app/**/*.ts", "src/app/**/*.cts", "src/shared/**/*.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test-util.ts"]
+}
