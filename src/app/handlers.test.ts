@@ -40,9 +40,9 @@ describe("settings", () => {
     const { settings } = setup();
     await expect(settings.get()).resolves.toEqual({ accountName: null, lastVaultId: null, trashAfterSave: false });
 
-    await settings.update({ accountName: "Butcher Family" });
+    await settings.update({ accountName: "Example Family" });
     await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({
-      accountName: "Butcher Family",
+      accountName: "Example Family",
       lastVaultId: null,
       trashAfterSave: false,
     });
@@ -59,15 +59,15 @@ describe("settings", () => {
     const settings = new SettingsStore(settingsFile);
 
     const [first, second] = await Promise.all([
-      settings.update({ accountName: "Butcher Family" }),
+      settings.update({ accountName: "Example Family" }),
       settings.update({ lastVaultId: "v-test" }),
     ]);
 
-    expect(first).toEqual({ accountName: "Butcher Family", lastVaultId: null, trashAfterSave: false });
-    expect(second).toEqual({ accountName: "Butcher Family", lastVaultId: "v-test", trashAfterSave: false });
+    expect(first).toEqual({ accountName: "Example Family", lastVaultId: null, trashAfterSave: false });
+    expect(second).toEqual({ accountName: "Example Family", lastVaultId: "v-test", trashAfterSave: false });
     // And on disk, read fresh.
     await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({
-      accountName: "Butcher Family",
+      accountName: "Example Family",
       lastVaultId: "v-test",
       trashAfterSave: false,
     });
@@ -104,17 +104,17 @@ describe("handlers", () => {
 
   it("stores a trimmed account name and lists vaults with it", async () => {
     const { handlers, connect } = setup();
-    await expect(handlers.setAccount("  Butcher Family ")).resolves.toMatchObject({
+    await expect(handlers.setAccount("  Example Family ")).resolves.toMatchObject({
       ok: true,
-      value: { accountName: "Butcher Family" },
+      value: { accountName: "Example Family" },
     });
     await expect(handlers.listVaults()).resolves.toEqual({ ok: true, value: [{ id: VAULT, title: "PaperRouteTest" }] });
-    expect(connect).toHaveBeenCalledWith(expect.objectContaining({ accountName: "Butcher Family" }));
+    expect(connect).toHaveBeenCalledWith(expect.objectContaining({ accountName: "Example Family" }));
   });
 
   it("reuses one session across calls (one approval prompt per process)", async () => {
     const { handlers, connect } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     await handlers.listVaults();
     await handlers.save({ filePath: file, vaultId: VAULT });
     expect(connect).toHaveBeenCalledTimes(1);
@@ -132,7 +132,7 @@ describe("handlers", () => {
 
   it("saves with the paper-route tag and remembers the vault", async () => {
     const { handlers, client, settings } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
 
     const result = await handlers.save({ filePath: file, vaultId: VAULT, title: "Dentist" });
 
@@ -143,7 +143,7 @@ describe("handlers", () => {
 
   it("defaults the title to the file name when the title is blank", async () => {
     const { handlers } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     await expect(handlers.save({ filePath: file, vaultId: VAULT, title: "  " })).resolves.toMatchObject({
       ok: true,
       value: { title: "receipt.pdf" },
@@ -152,7 +152,7 @@ describe("handlers", () => {
 
   it("returns core errors with their code and details, and doesn't remember the vault on failure", async () => {
     const { handlers, client, settings } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     client.seed({ id: "existing", title: "receipt.pdf", vaultId: VAULT, category: "Document" as never });
 
     await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toEqual({
@@ -169,7 +169,7 @@ describe("handlers", () => {
 
   it("reports a save as successful even if remembering the vault fails", async () => {
     const { handlers, client, settings } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     // Block the settings file so the next write fails.
     const { mkdir } = await import("node:fs/promises");
     await rm(settingsFile);
@@ -186,7 +186,7 @@ describe("handlers", () => {
 
   it("validates save arguments from the window before doing anything", async () => {
     const { handlers, connect } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     const bad: unknown[] = [
       null,
       "receipt.pdf",
@@ -207,11 +207,11 @@ describe("handlers", () => {
 
   it("writes the settings file privately", async () => {
     const { handlers } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
     const { mode } = await import("node:fs/promises").then((fs) => fs.stat(settingsFile));
     expect(mode & 0o777).toBe(0o600);
     expect(JSON.parse(await readFile(settingsFile, "utf8"))).toEqual({
-      accountName: "Butcher Family",
+      accountName: "Example Family",
       lastVaultId: null,
       trashAfterSave: false,
     });
@@ -221,14 +221,14 @@ describe("handlers", () => {
 describe("move to Trash after saving", () => {
   async function withTrashOn(client?: FakeClient) {
     const s = setup(client);
-    await s.handlers.setAccount("Butcher Family");
+    await s.handlers.setAccount("Example Family");
     await s.handlers.setTrashAfterSave(true);
     return s;
   }
 
   it("is off by default: the original stays and Trash is never touched", async () => {
     const { handlers, trash } = setup();
-    await handlers.setAccount("Butcher Family");
+    await handlers.setAccount("Example Family");
 
     await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({
       ok: true,
