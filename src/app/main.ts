@@ -10,15 +10,15 @@ import { BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, native
 import type { IpcMainInvokeEvent } from "electron";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { CHANNELS } from "../shared/api.js";
 import { createHandlers } from "./handlers.js";
+import { isOurPage } from "./sender.js";
 import { SettingsStore } from "./settings.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { version } = createRequire(import.meta.url)("../../package.json") as { version: string };
 const INDEX_HTML = join(here, "../renderer/index.html");
-const INDEX_URL = pathToFileURL(INDEX_HTML).href;
 const HOTKEY = "Control+Alt+P";
 // Spelled out: the ⌃ symbol is easy to mistake for an arrow key.
 const HOTKEY_WORDS = "Control-Option-P";
@@ -53,7 +53,7 @@ async function start(): Promise<void> {
   });
 
   // Only our own page may call these. Arguments are validated in handlers.
-  const fromOurWindow = (event: IpcMainInvokeEvent) => event.senderFrame?.url === INDEX_URL;
+  const fromOurWindow = (event: IpcMainInvokeEvent) => isOurPage(event.senderFrame?.url, INDEX_HTML);
   const handle = <A extends unknown[], R>(channel: string, fn: (...args: A) => Promise<R>) =>
     ipcMain.handle(channel, (event, ...args) => {
       if (!fromOurWindow(event)) throw new Error("Rejected IPC from an unexpected sender");
