@@ -20,7 +20,7 @@ describe("encodedSize", () => {
     "all single-digit bytes": new Uint8Array(1000),
     "all three-digit bytes": new Uint8Array(1000).fill(255),
     "digit boundaries": Uint8Array.of(0, 9, 10, 99, 100, 255),
-    "utf-8 text": new TextEncoder().encode("Paper Route test — ünïcödé\n".repeat(200)),
+    "utf-8 text": new TextEncoder().encode("PaperRoute test — ünïcödé\n".repeat(200)),
     "random 256 KiB": new Uint8Array(randomBytes(256 * 1024)),
   };
 

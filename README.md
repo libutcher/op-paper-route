@@ -1,4 +1,4 @@
-# Paper Route
+# PaperRoute
 
 A small macOS utility for getting a document you just downloaded into a 1Password vault with as little friction as possible: one Touch ID, drop the file, done.
 
@@ -6,22 +6,39 @@ Built on the official [1Password JavaScript SDK](https://github.com/1Password/on
 
 ## Status
 
-Work in progress. The core library and a command-line interface exist; the desktop app does not yet.
+Work in progress. The desktop app runs from source; there's no packaged build yet.
 
 | Milestone | State |
 |---|---|
 | M0 Prove an upload works end to end | Done |
 | M1 Core library with tests, and a CLI | Done |
-| M2 Electron shell: menu bar, drop zone, vault picker | Next |
-| M3 Friction removal: Finder Quick Action, hotkey, remember vault | |
+| M2 Desktop app: menu bar, hotkey, drop zone, vault picker | Done |
+| M3 Friction removal: Finder Quick Action, optional move to Trash after saving | Next |
 | M4 Signed and notarized build | |
 
-## Using the CLI
+## Using the app
 
-Requirements: Node 20 or later, the 1Password desktop app with **Settings → Developer → Integrate with 1Password SDKs** turned on.
+Requirements: macOS, Node 20 or later, and the 1Password desktop app with **Settings → Developer → Integrate with 1Password SDKs** turned on.
 
 ```sh
 npm install
+npm start
+```
+
+PaperRoute lives in the menu bar as a 📄 icon, with no Dock icon. Press **Control-Option-P** (or click the icon) to open its window:
+
+1. The first time, enter your 1Password account name, as shown at the top of the 1Password sidebar.
+2. Approve the request in 1Password. Approval lasts until 1Password locks or ten minutes pass without use.
+3. Drop a document on the window, or choose one. The title fills in from the file name and the last vault you used is already selected.
+4. Press **Return**. **Esc** hides the window.
+
+If a document with the same title is already in the vault, PaperRoute asks before saving another. Saved documents are tagged `paper-route`. Settings (the account name and last vault) are kept in `~/Library/Application Support/paper-route/settings.json`; nothing secret is stored there.
+
+## Using the CLI
+
+Same requirements as the app.
+
+```sh
 export PAPER_ROUTE_ACCOUNT="<account name as shown in the 1Password sidebar>"
 
 npm run vaults                                   # list vaults with their ids
@@ -38,14 +55,20 @@ If two vaults share a name, `--vault` must be the id. A second document with the
 ```sh
 npm test               # unit tests against an in-memory fake; never prompts
 npm run typecheck
+npm run build          # compile to dist/ (npm start does this too)
 PAPER_ROUTE_LIVE=1 npm test   # also runs the live test against the real app (one prompt)
 ```
 
 The live test creates one small document in the vault named by `PAPER_ROUTE_TEST_VAULT` (default `PaperRouteTest`) and deletes it again.
 
+If Electron starts and immediately exits with an error about `app` being undefined, `ELECTRON_RUN_AS_NODE` is set in your shell (VS Code's terminal sets it). `npm start` clears it; to run Electron by hand, use `env -u ELECTRON_RUN_AS_NODE npx electron .`.
+
 ### Layout
 
 - `src/core/` — everything that talks to 1Password, with no UI dependencies. `Session` owns the one long-lived SDK client; `saveDocument` reads a file, checks it fits, creates the item, reads it back and verifies the bytes; `listVaults` and `findVault`; `PaperRouteError` with a `code` the UI can switch on.
+- `src/app/` — the Electron main process. `main.ts` sets up the menu-bar icon, shortcut and window; `handlers.ts` implements each request from the window, without Electron imports so it can be tested; `preload.cts` is the only bridge into the sandboxed window.
+- `src/renderer/` — the window: a sandboxed page with no Node access.
+- `src/shared/` — types and the window ↔ main-process API, shared by both sides.
 - `src/cli.ts` — the command-line interface, built on the core.
 
 ## Things worth knowing about the SDK

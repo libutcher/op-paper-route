@@ -1,10 +1,8 @@
 import { PaperRouteError, messageFor } from "./errors.js";
 import type { Session } from "./session.js";
+import type { VaultSummary } from "../shared/types.js";
 
-export interface VaultSummary {
-  id: string;
-  title: string;
-}
+export type { VaultSummary };
 
 /**
  * Every vault the account can see, sorted by title then id.

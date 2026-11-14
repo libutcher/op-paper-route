@@ -1,5 +1,5 @@
 /**
- * The slice of the 1Password SDK client that Paper Route uses. Keeping it
+ * The slice of the 1Password SDK client that PaperRoute uses. Keeping it
  * narrow means tests can run against an in-memory fake, and the real
  * `Client` satisfies it structurally (checked at compile time in session.ts).
  */

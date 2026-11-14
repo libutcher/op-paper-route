@@ -1,5 +1,5 @@
 /**
- * Paper Route core: save local documents into 1Password. No UI, no Electron.
+ * PaperRoute core: save local documents into 1Password. No UI, no Electron.
  *
  *   const session = new Session({ accountName, integrationName, integrationVersion });
  *   const vaults = await listVaults(session);          // pick by id — titles repeat
