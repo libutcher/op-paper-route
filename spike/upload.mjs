@@ -99,7 +99,10 @@ lap(`created item ${created.id} "${created.title}" in "${vault.title}"`);
 
 // 5. Read it back and verify the bytes match.
 // items.create already returns the document's FileAttributes, so no items.get.
-const roundTrip = await client.items.files.read(vault.id, created.id, created.document);
+// The SDK only revives non-empty byte arrays into a Uint8Array; a zero-byte file
+// comes back as a plain [] with no byteLength. Normalise before comparing.
+const raw = await client.items.files.read(vault.id, created.id, created.document);
+const roundTrip = raw instanceof Uint8Array ? raw : Uint8Array.from(raw);
 const same =
   roundTrip.byteLength === content.byteLength &&
   roundTrip.every((b, i) => b === content[i]);
