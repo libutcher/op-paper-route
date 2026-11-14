@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for PaperRoute.app, signed with the hardened runtime.
+
+  allow-jit                  Electron's JavaScript engine (V8) compiles code at
+                             run time, which the hardened runtime forbids unless
+                             allowed.
+  disable-library-validation The 1Password SDK loads libop_sdk_ipc_client.dylib
+                             from inside 1Password.app. That library is signed by
+                             1Password's team, not ours, and the hardened runtime
+                             only loads libraries signed by the app's own team
+                             unless this is set. Without it, desktop sign-in
+                             can't work.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>
