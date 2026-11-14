@@ -18,7 +18,7 @@ What PaperRoute never does: it stores no tokens or passwords, uses no service ac
 ## Requirements
 
 - **macOS** on Apple silicon (an Intel build can be made from source).
-- **The 1Password desktop app**, with **Settings → Developer → Integrate with 1Password SDKs** turned on. PaperRoute talks to 1Password only through this.
+- **The 1Password desktop app**, with **Settings → Developer → Integrate with 1Password SDKs** turned on. 
 
 ## Installation
 
