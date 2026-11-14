@@ -6,7 +6,7 @@ Built on the official [1Password JavaScript SDK](https://github.com/1Password/on
 
 ## Status
 
-Work in progress. The desktop app runs from source; there's no packaged build yet.
+Usable, and packaged as a Mac app. It isn't signed with an Apple Developer ID yet, so on a Mac other than the one it was built on, macOS asks you to allow it once (see [Installing](#installing)).
 
 | Milestone | State |
 |---|---|
@@ -14,16 +14,20 @@ Work in progress. The desktop app runs from source; there's no packaged build ye
 | M1 Core library with tests, and a CLI | Done |
 | M2 Desktop app: menu bar, hotkey, drop zone, vault picker | Done |
 | M3 Getting files in: Finder Quick Action, drop on the menu-bar icon, optional move to Trash | Done |
-| M4 Signed and notarized build | Next |
+| M4a Packaged app: disk image, app icon, hardened runtime, locked-down Electron | Done |
+| M4b Developer ID signing and notarisation | Needs an Apple Developer membership |
+
+## Installing
+
+Requirements: macOS on Apple silicon or Intel, and the 1Password desktop app with **Settings → Developer → Integrate with 1Password SDKs** turned on.
+
+1. Open `PaperRoute-<version>-<arch>.dmg` and drag **PaperRoute** to **Applications**.
+2. Open it from Applications. Because the app isn't signed with a Developer ID yet, macOS may refuse the first time: go to **System Settings → Privacy & Security**, find the message about PaperRoute, and choose **Open Anyway**. You only do this once.
+3. To add the Finder Quick Action, click the paper-plane icon in the menu bar and choose **Install Finder Quick Action…**.
+
+To build the disk image yourself: `npm install`, then `npm run dmg` (it lands in `out/`).
 
 ## Using the app
-
-Requirements: macOS, Node 20 or later, and the 1Password desktop app with **Settings → Developer → Integrate with 1Password SDKs** turned on.
-
-```sh
-npm install
-npm start
-```
 
 PaperRoute lives in the menu bar as a small paper-plane icon, with no Dock icon. Press **Control-Option-P** (or click the icon) to open its window:
 
@@ -40,18 +44,13 @@ Settings (the account name, last vault and Trash option) are kept in `~/Library/
 
 ### Finder Quick Action
 
-```sh
-npm run install-quick-action     # builds the app, then installs it
-npm run uninstall-quick-action
-```
+Install it from the menu-bar icon: **Install Finder Quick Action…** (the same item removes it again). It adds **Save to 1Password with PaperRoute** to Finder: right-click a file → **Quick Actions**. PaperRoute opens with the file loaded; press Return to save. If PaperRoute is already running, the file goes to that copy, so there's no second approval. With several files selected, the first is used. The Quick Action finds PaperRoute by its bundle identifier, so it keeps working wherever the app is installed.
 
-This adds **Save to 1Password with PaperRoute** to Finder: right-click a file → **Quick Actions**. PaperRoute opens with the file loaded; press Return to save. If PaperRoute is already running, the file goes to that copy, so there's no second approval. With several files selected, the first is used.
-
-**A new Quick Action may start switched off.** If it isn't in the Quick Actions menu, turn it on in **System Settings → General → Login Items & Extensions → Extensions → Finder** (click the ⓘ). It's also available under **Services** at the bottom of the right-click menu. Until there's a packaged app, the Quick Action runs PaperRoute from this folder; if you move the folder, install it again.
+**A new Quick Action may start switched off.** If it isn't in the Quick Actions menu, turn it on in **System Settings → General → Login Items & Extensions → Extensions → Finder** (click the ⓘ). It's also available under **Services** at the bottom of the right-click menu.
 
 ## Using the CLI
 
-Same requirements as the app.
+Runs from source: Node 20 or later, `npm install`, and the same 1Password setting as the app.
 
 ```sh
 export PAPER_ROUTE_ACCOUNT="<account name as shown in the 1Password sidebar>"
@@ -67,27 +66,49 @@ If two vaults share a name, `--vault` must be the id. A second document with the
 
 ## Development
 
+Needs Node 20 or later.
+
 ```sh
+npm install
+npm start              # build and run from source
 npm test               # unit tests against an in-memory fake; never prompts
 npm run typecheck
 npm run build          # compile to dist/ (npm start does this too)
-npm run render-icons   # re-render the menu-bar icon PNGs from assets/tray-icon.svg
+npm run package        # build out/PaperRoute-darwin-<arch>/PaperRoute.app
+npm run dmg            # package, then build out/PaperRoute-<version>-<arch>.dmg
+npm run render-icons   # re-render the menu-bar and app icons from assets/*.svg
+npm run install-quick-action     # Quick Action for this source copy (the packaged app installs its own)
 PAPER_ROUTE_USER_DATA=/tmp/pr-test npm start   # run with separate settings, e.g. to see the first-run screen
 PAPER_ROUTE_LIVE=1 npm test   # also runs the live test against the real app (one prompt)
 ```
 
 The live test creates one small document in the vault named by `PAPER_ROUTE_TEST_VAULT` (default `PaperRouteTest`) and deletes it again.
 
-If Electron starts and immediately exits with an error about `app` being undefined, `ELECTRON_RUN_AS_NODE` is set in your shell (VS Code's terminal sets it). `npm start` clears it; to run Electron by hand, use `env -u ELECTRON_RUN_AS_NODE npx electron .`.
+If Electron starts and immediately exits with an error about `app` being undefined, `ELECTRON_RUN_AS_NODE` is set in your shell (VS Code's terminal sets it). `npm start` clears it; to run Electron by hand, use `env -u ELECTRON_RUN_AS_NODE npx electron .`. The packaged app ignores it (see below).
+
+### Packaging
+
+`npm run package` signs the app **ad hoc** with the hardened runtime, using `build/entitlements.plist`:
+
+- `allow-jit` for Electron's JavaScript engine;
+- `disable-library-validation`, so the hardened app can load 1Password's SDK library, which is signed by 1Password's team rather than ours.
+
+It also flips Electron's **fuses** before signing, so the shipped app can't be made to run other code: `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect` are ignored, and the app runs only its own `app.asar`, whose hash is checked at launch.
+
+**Test the packaged app the way users launch it:** from Finder, or with `open`. Started from a terminal inside VS Code, macOS treats VS Code as responsible for it, so 1Password's approval prompt names VS Code instead of PaperRoute.
+
+Signing with a Developer ID and notarising (M4b) needs an Apple Developer membership; only the signing identity in `scripts/package.mjs` changes, plus a notarisation step.
 
 ### Layout
 
 - `src/core/` — everything that talks to 1Password, with no UI dependencies. `Session` owns the one long-lived SDK client; `saveDocument` reads a file, checks it fits, creates the item, reads it back and verifies the bytes; `listVaults` and `findVault`; `PaperRouteError` with a `code` the UI can switch on.
-- `src/app/` — the Electron main process. `main.ts` sets up the menu-bar icon, shortcut and window; `handlers.ts` implements each request from the window; `handoff.ts` takes files from Finder, the menu-bar icon and other launches; `preload.cts` is the only bridge into the sandboxed window. Everything but `main.ts` and the preload is free of Electron imports, so it can be tested.
+- `src/app/` — the Electron main process. `main.ts` sets up the menu-bar icon, shortcut and window; `handlers.ts` implements each request from the window; `account-names.ts` decides which spellings of an account name to try; `handoff.ts` takes files from Finder, the menu-bar icon and other launches; `preload.cts` is the only bridge into the sandboxed window. Everything but `main.ts` and the preload is free of Electron imports, so it can be tested.
 - `src/renderer/` — the window: a sandboxed page with no Node access.
 - `src/shared/` — types, the window ↔ main-process API, and `window-logic.ts`: the window's decisions (when to offer Try Again, when a 1Password prompt is likely, how titles are filled in), kept out of the DOM code so they can be tested.
 - `src/cli.ts` — the command-line interface, built on the core.
-- `scripts/quick-action.mjs` — installs and removes the Finder Quick Action.
+- `src/app/quick-action.ts` — builds the Finder Quick Action's workflow; used by the app's menu and by `scripts/quick-action.mjs`.
+- `scripts/` — packaging (`package.mjs`, `make-dmg.mjs`), icon rendering, and the development Quick Action installer.
+- `assets/` and `build/` — icon sources and outputs, and the entitlements.
 
 ## Things worth knowing about the SDK
 
