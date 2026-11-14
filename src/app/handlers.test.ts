@@ -38,14 +38,13 @@ function setup(client: FakeClient = fakeClient([{ id: VAULT, title: "PaperRouteT
 describe("settings", () => {
   it("starts empty, persists updates, and survives a corrupt file", async () => {
     const { settings } = setup();
-    await expect(settings.get()).resolves.toEqual({ accountName: null, lastVaultId: null, trashAfterSave: false, approveEverySave: false });
+    await expect(settings.get()).resolves.toEqual({ accountName: null, lastVaultId: null, trashAfterSave: false });
 
     await settings.update({ accountName: "Example Family" });
     await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({
       accountName: "Example Family",
       lastVaultId: null,
       trashAfterSave: false,
-      approveEverySave: false,
     });
 
     await writeFile(settingsFile, "{not json");
@@ -53,7 +52,6 @@ describe("settings", () => {
       accountName: null,
       lastVaultId: null,
       trashAfterSave: false,
-      approveEverySave: false,
     });
   });
 
@@ -65,14 +63,13 @@ describe("settings", () => {
       settings.update({ lastVaultId: "v-test" }),
     ]);
 
-    expect(first).toEqual({ accountName: "Example Family", lastVaultId: null, trashAfterSave: false, approveEverySave: false });
-    expect(second).toEqual({ accountName: "Example Family", lastVaultId: "v-test", trashAfterSave: false, approveEverySave: false });
+    expect(first).toEqual({ accountName: "Example Family", lastVaultId: null, trashAfterSave: false });
+    expect(second).toEqual({ accountName: "Example Family", lastVaultId: "v-test", trashAfterSave: false });
     // And on disk, read fresh.
     await expect(new SettingsStore(settingsFile).get()).resolves.toEqual({
       accountName: "Example Family",
       lastVaultId: "v-test",
       trashAfterSave: false,
-      approveEverySave: false,
     });
     // No temp files left behind.
     const { readdir } = await import("node:fs/promises");
@@ -295,7 +292,6 @@ describe("handlers", () => {
       accountName: "Example Family",
       lastVaultId: null,
       trashAfterSave: false,
-      approveEverySave: false,
     });
   });
 });
@@ -342,7 +338,7 @@ describe("move to Trash after saving", () => {
     }
 
     await writeFile(settingsFile, JSON.stringify({ trashAfterSave: "yes" }));
-    await expect(new SettingsStore(settingsFile).get()).resolves.toMatchObject({ trashAfterSave: false, approveEverySave: false });
+    await expect(new SettingsStore(settingsFile).get()).resolves.toMatchObject({ trashAfterSave: false });
   });
 
   it("leaves the original alone when the save fails", async () => {
@@ -440,68 +436,5 @@ describe("move to Trash after saving", () => {
     expect(client.stored.size).toBe(1);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("couldn't move the original to the Trash"));
     warn.mockRestore();
-  });
-});
-
-describe("dropping 1Password's approval", () => {
-  it("dropSession() makes the next call connect (and prompt) again, and tells the window", async () => {
-    const client = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
-    const connect = vi.fn<Connect>(async () => client);
-    const onSessionDropped = vi.fn();
-    const settings = new SettingsStore(settingsFile);
-    const handlers = createHandlers({ settings, integrationName: "t", integrationVersion: "0", connect, trash: vi.fn(), onSessionDropped });
-    await handlers.setAccount("Example Family");
-    await handlers.listVaults();
-    const before = connect.mock.calls.length;
-
-    handlers.dropSession();
-    expect(onSessionDropped).toHaveBeenCalledTimes(1);
-
-    await expect(handlers.listVaults()).resolves.toMatchObject({ ok: true });
-    expect(connect).toHaveBeenCalledTimes(before + 1);
-  });
-
-  it("is harmless before any session exists", () => {
-    const { handlers } = setup();
-    expect(() => handlers.dropSession()).not.toThrow();
-  });
-
-  it("with 'approve every save' on, each save ends the approval; the next one connects again", async () => {
-    const client = fakeClient([{ id: VAULT, title: "PaperRouteTest" }]);
-    const connect = vi.fn<Connect>(async () => client);
-    const onSessionDropped = vi.fn();
-    const settings = new SettingsStore(settingsFile);
-    const handlers = createHandlers({ settings, integrationName: "t", integrationVersion: "0", connect, trash: vi.fn(), onSessionDropped });
-    await handlers.setAccount("Example Family");
-    await expect(handlers.setApproveEverySave(true)).resolves.toMatchObject({ ok: true, value: { approveEverySave: true } });
-    const before = connect.mock.calls.length;
-
-    await expect(handlers.save({ filePath: file, vaultId: VAULT })).resolves.toMatchObject({ ok: true });
-    expect(connect).toHaveBeenCalledTimes(before); // the save itself reused the approval
-    expect(onSessionDropped).toHaveBeenCalledTimes(1); // and ended it afterwards
-
-    await writeFile(file, "pdf bytes"); // the first save may have moved nothing; make sure the file is there
-    await expect(handlers.save({ filePath: file, vaultId: VAULT, title: "second" })).resolves.toMatchObject({ ok: true });
-    expect(connect).toHaveBeenCalledTimes(before + 1); // the next save had to connect again
-  });
-
-  it("with the option off, saves share one approval", async () => {
-    const { handlers, connect } = setup();
-    await handlers.setAccount("Example Family");
-    const before = connect.mock.calls.length;
-    await handlers.save({ filePath: file, vaultId: VAULT });
-    await handlers.save({ filePath: file, vaultId: VAULT, title: "second" });
-    expect(connect).toHaveBeenCalledTimes(before);
-  });
-
-  it("setApproveEverySave accepts only true or false, and anything else on disk means off", async () => {
-    const { handlers } = setup();
-    for (const bad of ["yes", 1, null]) {
-      await expect(handlers.setApproveEverySave(bad)).resolves.toMatchObject({ ok: false, error: { code: "INVALID_REQUEST" } });
-    }
-    // Saving once creates the settings file; then overwrite it with a non-boolean.
-    await handlers.setApproveEverySave(true);
-    await writeFile(settingsFile, JSON.stringify({ approveEverySave: "yes" }));
-    await expect(new SettingsStore(settingsFile).get()).resolves.toMatchObject({ approveEverySave: false });
   });
 });

@@ -26,8 +26,6 @@ export interface AppState {
   lastVaultId: string | null;
   /** Move the original file to the Trash once it's safely in 1Password. Off by default. */
   trashAfterSave: boolean;
-  /** Drop 1Password's approval after every save, so each save is approved separately. Off by default. */
-  approveEverySave: boolean;
 }
 
 /**
@@ -66,7 +64,6 @@ export interface PaperRouteApi {
   listVaults(): Promise<Result<VaultSummary[]>>;
   save(args: SaveArgs): Promise<Result<SaveOutcome>>;
   setTrashAfterSave(on: boolean): Promise<Result<AppState>>;
-  setApproveEverySave(on: boolean): Promise<Result<AppState>>;
   /** Opens the native file picker; resolves to a path, or null if cancelled. */
   chooseFile(): Promise<string | null>;
   /** The filesystem path of a file dropped onto the window. */
@@ -81,9 +78,7 @@ export interface PaperRouteApi {
    */
   takeIncomingFile(): Promise<IncomingFile | null>;
   onIncomingFile(listener: (file: IncomingFile) => void): void;
-  /** Called when the main process drops 1Password's approval (window hidden, idle, or after a save); the next call will prompt. */
-  onApprovalDropped(listener: () => void): void;
-  /** Called when the user chooses the account/approval settings from the menu-bar menu. */
+  /** Called when the user chooses "1Password Account…" from the menu-bar menu. */
   onShowSetup(listener: () => void): void;
 }
 
@@ -99,7 +94,5 @@ export const CHANNELS = {
   takeIncomingFile: "paper-route:take-incoming-file",
   incomingFile: "paper-route:incoming-file",
   setTrashAfterSave: "paper-route:set-trash-after-save",
-  setApproveEverySave: "paper-route:set-approve-every-save",
-  approvalDropped: "paper-route:approval-dropped",
   showSetup: "paper-route:show-setup",
 } as const;

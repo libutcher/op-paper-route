@@ -18,22 +18,12 @@ export interface HandlerOptions {
   connect?: Connect;
   /** Moves a file to the Trash (Electron's shell.trashItem in the app). */
   trash: (path: string) => Promise<void>;
-  /** Called whenever 1Password's approval is dropped, so the window can expect a prompt. */
-  onSessionDropped?: () => void;
 }
 
 export interface Handlers {
   getState(): Promise<AppState>;
   setAccount(accountName: unknown): Promise<Result<AppState>>;
   setTrashAfterSave(on: unknown): Promise<Result<AppState>>;
-  setApproveEverySave(on: unknown): Promise<Result<AppState>>;
-  /**
-   * Forget 1Password's approval: the next call prompts again. Called when the
-   * window hides or goes idle, and after each save when approveEverySave is on.
-   * 1Password still enforces its own limits (ten minutes idle, or locking);
-   * this only shortens the window in which the approval could be used.
-   */
-  dropSession(): void;
   listVaults(): Promise<Result<VaultSummary[]>>;
   save(args: unknown): Promise<Result<SaveOutcome>>;
 }
@@ -85,11 +75,6 @@ export function createHandlers(options: HandlerOptions): Handlers {
     return session;
   };
 
-  const dropSession = (): void => {
-    session?.disconnect();
-    options.onSessionDropped?.();
-  };
-
   const requireSession = async (): Promise<Session> => {
     const { accountName } = await settings.get();
     if (!accountName) {
@@ -138,12 +123,6 @@ export function createHandlers(options: HandlerOptions): Handlers {
       return attempt(() => settings.update({ trashAfterSave: on }));
     },
 
-    async setApproveEverySave(on) {
-      if (typeof on !== "boolean") return invalid("The approval option must be on or off");
-      return attempt(() => settings.update({ approveEverySave: on }));
-    },
-
-    dropSession,
 
     async listVaults() {
       return attempt(async () => listVaults(await requireSession()));
@@ -182,7 +161,7 @@ export function createHandlers(options: HandlerOptions): Handlers {
         // Read the Trash option now, not when the save started: a save can
         // wait minutes for 1Password's approval, and if the box was unticked
         // meanwhile, that is what the user wants for this file.
-        const { trashAfterSave, approveEverySave } = await settings.get();
+        const { trashAfterSave } = await settings.get();
         let original: OriginalFile = "kept";
         if (trashAfterSave) {
           const after = await fingerprint(filePath);
@@ -201,9 +180,6 @@ export function createHandlers(options: HandlerOptions): Handlers {
             }
           }
         }
-        // With approve-every-save on, this approval ends here; the next save
-        // (and anything else) asks 1Password again.
-        if (approveEverySave) dropSession();
         return { ...result, original };
       });
     },

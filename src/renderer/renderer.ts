@@ -53,7 +53,6 @@ const titleInput = $<HTMLInputElement>("title");
 const vaultSelect = $<HTMLSelectElement>("vault");
 const saveButton = $<HTMLButtonElement>("save");
 const trashCheckbox = $<HTMLInputElement>("trash-after-save");
-const approveCheckbox = $<HTMLInputElement>("approve-every-save");
 const statusEl = $<HTMLDivElement>("status");
 const statusActions = $<HTMLDivElement>("status-actions");
 
@@ -386,16 +385,6 @@ vaultSelect.addEventListener("change", () => {
 });
 titleInput.addEventListener("input", clearStalePrompt);
 
-approveCheckbox.addEventListener("change", async () => {
-  const result = await api.setApproveEverySave(approveCheckbox.checked);
-  if (result.ok) {
-    approveCheckbox.checked = result.value.approveEverySave;
-    return;
-  }
-  approveCheckbox.checked = (await api.getState()).approveEverySave;
-  setStatus(`Couldn't change the approval option: ${result.error.message}`, "error");
-});
-
 trashCheckbox.addEventListener("change", async () => {
   const result = await api.setTrashAfterSave(trashCheckbox.checked);
   if (result.ok) {
@@ -451,7 +440,6 @@ function showSaveView(lastVaultId: string | null): void {
 
 const state = await api.getState();
 trashCheckbox.checked = state.trashAfterSave;
-approveCheckbox.checked = state.approveEverySave;
 if (state.accountName) {
   accountInput.value = state.accountName;
   showSaveView(state.lastVaultId);
@@ -462,11 +450,8 @@ if (state.accountName) {
 // Files from Finder or the menu-bar icon. Listen first, then collect anything
 // that arrived while the page was loading (a Quick Action that started the
 // app), so nothing falls into the gap between the two.
-// The main process drops 1Password's approval when the window hides or goes
-// idle (and after each save, if that option is on): the next call will prompt.
-api.onApprovalDropped(() => approval.reset());
-// From the menu-bar menu: change the account or the approval option. The
-// account field is already prefilled with the current name.
+// From the menu-bar menu: change the account. The field is prefilled with the
+// current name.
 api.onShowSetup(() => showAccountView());
 api.onIncomingFile(offerFile);
 const early = await api.takeIncomingFile();

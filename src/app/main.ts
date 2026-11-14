@@ -22,7 +22,6 @@ import {
   uninstallQuickAction,
 } from "./quick-action.js";
 import { createHandlers } from "./handlers.js";
-import { IdleTimer } from "./idle.js";
 import { isOurPage } from "./sender.js";
 import { SettingsStore } from "./settings.js";
 
@@ -30,8 +29,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const { version } = createRequire(import.meta.url)("../../package.json") as { version: string };
 const INDEX_HTML = join(here, "../renderer/index.html");
 const HOTKEY = "Control+Alt+P";
-/** Drop 1Password's approval after this long with the window open but unused. */
-const IDLE_DROP_MS = 3 * 60 * 1000;
 // Spelled out: the ⌃ symbol is easy to mistake for an arrow key.
 const HOTKEY_WORDS = "Control-Option-P";
 
@@ -109,27 +106,19 @@ async function start(): Promise<void> {
     integrationVersion: version,
     // The Trash, not deletion: the user can always get the file back.
     trash: (path) => shell.trashItem(path),
-    onSessionDropped: () => win?.webContents.send(CHANNELS.approvalDropped),
   });
-
-  // 1Password's approval is dropped when the window has been open but unused
-  // for a while (and when it hides, below), so it can't sit around usable.
-  // Calls in flight never count as idle: a save can wait minutes for the prompt.
-  const idle = new IdleTimer(IDLE_DROP_MS, () => handlers.dropSession());
 
   // Only our own page may call these. Arguments are validated in handlers.
   const fromOurWindow = (event: IpcMainInvokeEvent) => isOurPage(event.senderFrame?.url, INDEX_HTML);
   const handle = <A extends unknown[], R>(channel: string, fn: (...args: A) => Promise<R>) =>
     ipcMain.handle(channel, (event, ...args) => {
       if (!fromOurWindow(event)) throw new Error("Rejected IPC from an unexpected sender");
-      idle.busy();
-      return Promise.resolve(fn(...(args as A))).finally(() => idle.done());
+      return fn(...(args as A));
     });
 
   handle(CHANNELS.getState, () => handlers.getState());
   handle(CHANNELS.setAccount, (name: unknown) => handlers.setAccount(name));
   handle(CHANNELS.setTrashAfterSave, (on: unknown) => handlers.setTrashAfterSave(on));
-  handle(CHANNELS.setApproveEverySave, (on: unknown) => handlers.setApproveEverySave(on));
   handle(CHANNELS.listVaults, () => handlers.listVaults());
   handle(CHANNELS.save, (args: unknown) => handlers.save(args));
   handle(CHANNELS.chooseFile, async () => {
@@ -143,12 +132,6 @@ async function start(): Promise<void> {
   handle(CHANNELS.takeIncomingFile, async () => inbox.take());
 
   createWindow();
-  // Hidden means done for now: drop the approval rather than leave it usable.
-  win?.on("hide", () => {
-    idle.stop();
-    handlers.dropSession();
-  });
-  win?.on("show", () => idle.touch());
   createTray();
 
   // A first launch can carry a file too (the Quick Action starting the app).
@@ -248,7 +231,7 @@ function refreshTrayMenu(): void {
       // the global shortcut already owns it.
       { label: "Save a Document…", accelerator: HOTKEY, registerAccelerator: false, click: showWindow },
       {
-        label: "1Password Account & Approval…",
+        label: "1Password Account…",
         click: () => {
           showWindow();
           win?.webContents.send(CHANNELS.showSetup);

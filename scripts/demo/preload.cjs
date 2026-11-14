@@ -56,7 +56,6 @@ const api = {
   onIncomingFile: (listener) => {
     onIncoming = listener;
   },
-  onApprovalDropped: () => {},
   onShowSetup: () => {},
 };
 
