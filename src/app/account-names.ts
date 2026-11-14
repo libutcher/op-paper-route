@@ -30,7 +30,7 @@ function curlyApostrophes(name: string): string {
   return name.replace(/'/g, "’");
 }
 
-/** Each word starting with a capital: "butcher family" → "Butcher Family". Other letters are left alone. */
+/** Each word starting with a capital: "example family" → "Example Family". Other letters are left alone. */
 function capitaliseWords(name: string): string {
   return name.replace(/(^|[\s-])(\p{Ll})/gu, (_, before: string, letter: string) => before + letter.toUpperCase());
 }

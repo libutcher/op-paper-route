@@ -1,5 +1,7 @@
 # PaperRoute
 
+> **Version 0.1 — early and in progress.** PaperRoute works end to end, but it is young: expect rough edges, and the build is not yet signed with an Apple Developer ID. Issues and feedback are welcome.
+
 A small macOS utility for uploading a document to a 1Password vault with as little friction as possible. Built on the official [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js), with Touch ID authentication from the 1Password desktop app.
 
 <p align="left">

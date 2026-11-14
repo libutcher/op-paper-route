@@ -137,10 +137,10 @@ describe("handlers", () => {
     });
 
     it("finds the account when the apostrophe style differs", async () => {
-      const { handlers } = onlyAccount("Lucy’s Family");
-      await expect(handlers.setAccount("Lucy's Family")).resolves.toMatchObject({
+      const { handlers } = onlyAccount("Avery’s Family");
+      await expect(handlers.setAccount("Avery's Family")).resolves.toMatchObject({
         ok: true,
-        value: { accountName: "Lucy’s Family" },
+        value: { accountName: "Avery’s Family" },
       });
     });
 
