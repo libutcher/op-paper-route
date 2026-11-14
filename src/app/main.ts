@@ -162,9 +162,12 @@ function createWindow(): void {
   });
   win.webContents.on("did-fail-load", (_event, code, description, url) => {
     console.error(`[paper-route] window failed to load ${url}: ${description} (${code})`);
+    // The page may never draw now; don't let that make the window unshowable.
+    markWindowReady();
   });
   win.webContents.on("render-process-gone", (_event, details) => {
     console.error(`[paper-route] window process ended: ${details.reason} (exit code ${details.exitCode})`);
+    markWindowReady();
   });
 
   // Closing hides; the app lives in the menu bar until Quit.
@@ -175,10 +178,11 @@ function createWindow(): void {
     }
   });
 
-  win.once("ready-to-show", () => {
-    windowReady = true;
-    if (showWhenReady) showWindow();
-  });
+  win.once("ready-to-show", markWindowReady);
+  // Waiting for the first paint only avoids a flash. If it hasn't come after a
+  // few seconds, something is wrong, and the window must still be reachable
+  // from the hotkey and the menu rather than stuck hidden until a restart.
+  setTimeout(markWindowReady, READY_TIMEOUT_MS);
 
   void win.loadFile(INDEX_HTML);
 }
@@ -199,10 +203,18 @@ function createTray(): void {
   );
 }
 
-/** False until the page has drawn for the first time. */
+/** False until the page has drawn for the first time (or given up trying). */
 let windowReady = false;
 /** Something asked to show the window before it was ready. */
 let showWhenReady = false;
+const READY_TIMEOUT_MS = 5000;
+
+/** From now on the window can be shown; show it if that was asked for. Safe to call more than once. */
+function markWindowReady(): void {
+  if (windowReady) return;
+  windowReady = true;
+  if (showWhenReady) showWindow();
+}
 
 function showWindow(): void {
   if (!win) return;
