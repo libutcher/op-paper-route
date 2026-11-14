@@ -103,9 +103,7 @@ lap(`created item ${created.id} "${created.title}" in "${vault.title}"`);
 // comes back as a plain [] with no byteLength. Normalise before comparing.
 const raw = await client.items.files.read(vault.id, created.id, created.document);
 const roundTrip = raw instanceof Uint8Array ? raw : Uint8Array.from(raw);
-const same =
-  roundTrip.byteLength === content.byteLength &&
-  roundTrip.every((b, i) => b === content[i]);
+const same = Buffer.from(roundTrip).equals(content);
 lap(`read back ${roundTrip.byteLength} bytes — ${same ? "MATCH" : "MISMATCH"}`);
 
 process.exit(same ? 0 : 1);
