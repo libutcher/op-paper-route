@@ -20,6 +20,8 @@ const CH = {
   chooseFile: "paper-route:choose-file",
   hide: "paper-route:hide",
   shown: "paper-route:shown",
+  takeIncomingFile: "paper-route:take-incoming-file",
+  incomingFile: "paper-route:incoming-file",
 };
 
 const api: PaperRouteApi = {
@@ -33,6 +35,13 @@ const api: PaperRouteApi = {
   onShown: (listener) => {
     // Don't hand the IPC event object to the page.
     ipcRenderer.on(CH.shown, () => listener());
+  },
+  takeIncomingFile: () => ipcRenderer.invoke(CH.takeIncomingFile),
+  onIncomingFile: (listener) => {
+    // Pass on only the data, never the IPC event object.
+    ipcRenderer.on(CH.incomingFile, (_event, file: Parameters<typeof listener>[0]) =>
+      listener({ path: String(file.path), othersIgnored: Number(file.othersIgnored) || 0 }),
+    );
   },
 };
 

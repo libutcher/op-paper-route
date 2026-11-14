@@ -12,6 +12,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHANNELS } from "../shared/api.js";
+import { Inbox, firstFile, pathArguments } from "./handoff.js";
 import { createHandlers } from "./handlers.js";
 import { isOurPage } from "./sender.js";
 import { SettingsStore } from "./settings.js";
@@ -27,12 +28,39 @@ let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
 
+// Files handed to the app from outside the window wait here until the window
+// is ready for them.
+const inbox = new Inbox((file) => win?.webContents.send(CHANNELS.incomingFile, file));
+
+/** Take the first real file among `candidates`, show the window, and hand the file to it. */
+async function receive(candidates: readonly string[], cwd: string): Promise<void> {
+  const file = await firstFile(candidates, cwd);
+  if (!file) return;
+  inbox.deliver(file);
+  showWindow();
+}
+
+const isDefaultApp = process.defaultApp === true;
+
+// macOS "open with" (a file dropped on the app icon, or opened with it from
+// Finder) only fires for a packaged app; wired now so M4 needs no app changes.
+// It can arrive before the app is ready, so it's registered first.
+app.on("open-file", (event, path) => {
+  event.preventDefault();
+  void receive([path], "/");
+});
+
 // Two copies would each need their own 1Password approval. Hand off to the
 // running one instead.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on("second-instance", () => showWindow());
+  // A second launch, e.g. from the Finder Quick Action, carries its file
+  // paths on the command line.
+  app.on("second-instance", (_event, argv, workingDirectory) => {
+    showWindow();
+    void receive(pathArguments(argv, { isDefaultApp }), workingDirectory);
+  });
   app.whenReady().then(start).catch((err: unknown) => {
     dialog.showErrorBox("PaperRoute couldn't start", String(err));
     app.exit(1);
@@ -72,9 +100,13 @@ async function start(): Promise<void> {
   handle(CHANNELS.hide, async () => {
     win?.hide();
   });
+  handle(CHANNELS.takeIncomingFile, async () => inbox.take());
 
   createWindow();
   createTray();
+
+  // A first launch can carry a file too (the Quick Action starting the app).
+  void receive(pathArguments(process.argv, { isDefaultApp }), process.cwd());
 
   console.log(
     globalShortcut.register(HOTKEY, toggleWindow)
@@ -110,6 +142,8 @@ function createWindow(): void {
   // window to that file. Nothing in this app ever navigates or opens windows.
   win.webContents.on("will-navigate", (event) => event.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  // While the page (re)loads it can't receive files; hold them until it asks.
+  win.webContents.on("did-start-loading", () => inbox.reset());
 
   // Closing hides; the app lives in the menu bar until Quit.
   win.on("close", (event) => {
@@ -125,7 +159,8 @@ function createWindow(): void {
 function createTray(): void {
   tray = new Tray(nativeImage.createEmpty());
   tray.setTitle("📄");
-  tray.setToolTip(`PaperRoute — press ${HOTKEY_WORDS} to open`);
+  tray.setToolTip(`PaperRoute — press ${HOTKEY_WORDS}, or drop a file here`);
+  tray.on("drop-files", (_event, files) => void receive(files, "/"));
   tray.setContextMenu(
     Menu.buildFromTemplate([
       // Show the shortcut in the menu, but don't register it a second time:

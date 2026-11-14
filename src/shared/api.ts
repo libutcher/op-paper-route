@@ -35,6 +35,13 @@ export interface SaveArgs {
   allowDuplicate?: boolean;
 }
 
+/** A file handed to PaperRoute from outside the window (Finder, the menu-bar icon, another launch). */
+export interface IncomingFile {
+  path: string;
+  /** How many more files came with it; only one is saved at a time. */
+  othersIgnored: number;
+}
+
 export interface PaperRouteApi {
   getState(): Promise<AppState>;
   setAccount(accountName: string): Promise<Result<AppState>>;
@@ -48,6 +55,12 @@ export interface PaperRouteApi {
   hide(): Promise<void>;
   /** Called whenever the window is shown, so the UI can refocus and reset. */
   onShown(listener: () => void): void;
+  /**
+   * Call once the page is ready. Resolves to a file handed over before then
+   * (if any); later ones arrive through onIncomingFile.
+   */
+  takeIncomingFile(): Promise<IncomingFile | null>;
+  onIncomingFile(listener: (file: IncomingFile) => void): void;
 }
 
 /** IPC channel names, shared so main and preload can't drift apart. */
@@ -59,4 +72,6 @@ export const CHANNELS = {
   chooseFile: "paper-route:choose-file",
   hide: "paper-route:hide",
   shown: "paper-route:shown",
+  takeIncomingFile: "paper-route:take-incoming-file",
+  incomingFile: "paper-route:incoming-file",
 } as const;
