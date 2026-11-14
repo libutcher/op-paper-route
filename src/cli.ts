@@ -53,6 +53,8 @@ const OPTIONS = {
   help: { type: "boolean", short: "h" },
 } as const;
 
+const SAVE_ONLY_OPTIONS = ["vault", "title", "tag", "notes", "allow-duplicate"] as const;
+
 function parse(argv: string[]) {
   return parseArgs({ args: argv, options: OPTIONS, allowPositionals: true, strict: true });
 }
@@ -68,16 +70,40 @@ async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parsed;
   const [command, ...rest] = positionals;
 
+  const usage = (message: string) => {
+    console.error(`${message}\n\n${USAGE}`);
+    return 2;
+  };
+
   if (values.help || !command) {
     console.log(USAGE);
     return values.help ? 0 : 2;
   }
 
-  const accountName = values.account ?? process.env["PAPER_ROUTE_ACCOUNT"];
-  if (!accountName) {
-    console.error(`no account: pass --account NAME or set PAPER_ROUTE_ACCOUNT\n\n${USAGE}`);
-    return 2;
+  // Validate the command and its arguments first, so a typo is reported as a
+  // typo rather than as a missing account.
+  let filePath = "";
+  let vaultQuery = "";
+  switch (command) {
+    case "vaults": {
+      if (rest.length > 0) return usage(`vaults takes no arguments, got "${rest.join(" ")}"`);
+      const saveOnly = SAVE_ONLY_OPTIONS.filter((name) => values[name] !== undefined);
+      if (saveOnly.length > 0) return usage(`vaults doesn't take ${saveOnly.map((n) => `--${n}`).join(", ")}`);
+      break;
+    }
+    case "save": {
+      if (rest.length !== 1) return usage("save takes exactly one file");
+      if (!values.vault) return usage("save needs --vault <id|title>");
+      filePath = rest[0]!;
+      vaultQuery = values.vault;
+      break;
+    }
+    default:
+      return usage(`unknown command "${command}"`);
   }
+
+  const accountName = values.account ?? process.env["PAPER_ROUTE_ACCOUNT"];
+  if (!accountName) return usage("no account: pass --account NAME or set PAPER_ROUTE_ACCOUNT");
 
   const session = new Session({ accountName, integrationName: "Paper Route CLI", integrationVersion: version });
   const started = performance.now();
@@ -92,16 +118,7 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case "save": {
-      const [filePath] = rest;
-      if (!filePath || rest.length > 1) {
-        console.error(`save takes exactly one file\n\n${USAGE}`);
-        return 2;
-      }
-      if (!values.vault) {
-        console.error(`save needs --vault <id|title>\n\n${USAGE}`);
-        return 2;
-      }
-      const vault = await findVault(session, values.vault);
+      const vault = await findVault(session, vaultQuery);
       const result = await saveDocument(session, {
         filePath,
         vaultId: vault.id,
@@ -113,10 +130,6 @@ async function main(argv: string[]): Promise<number> {
       console.log(`saved "${result.title}" (${result.bytes} bytes) to "${vault.title}" as item ${result.itemId} in ${elapsed()}`);
       return 0;
     }
-
-    default:
-      console.error(`unknown command "${command}"\n\n${USAGE}`);
-      return 2;
   }
 }
 
