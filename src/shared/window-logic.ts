@@ -5,7 +5,7 @@
  * must stay free of Node and DOM APIs: plain data in, plain data out.
  */
 
-import type { ApiError, ErrorCode, IncomingFile, Result, VaultSummary } from "./api.js";
+import type { ApiError, ErrorCode, IncomingFile, OriginalFile, Result, VaultSummary } from "./api.js";
 
 /**
  * A file handed over from Finder or the menu-bar icon while a save is in
@@ -145,6 +145,21 @@ export function vaultOptions(vaults: readonly VaultSummary[]): Array<{ value: st
     value: v.id,
     label: (counts.get(v.title) ?? 0) > 1 ? `${v.title} (${v.id.slice(0, 6)})` : v.title,
   }));
+}
+
+/** The success message, including what happened to the original when the Trash option is on. */
+export function savedMessage(title: string, vaultName: string, original: OriginalFile): { text: string; tone: "ok" | "waiting" } {
+  const saved = `Saved “${title}” to ${vaultName}.`;
+  switch (original) {
+    case "kept":
+      return { text: saved, tone: "ok" };
+    case "trashed":
+      return { text: `${saved} The original is in the Trash.`, tone: "ok" };
+    case "changed":
+      return { text: `${saved} The original changed while saving, so it was left in place.`, tone: "waiting" };
+    case "failed":
+      return { text: `${saved} Couldn't move the original to the Trash; it's still in place.`, tone: "waiting" };
+  }
 }
 
 /** A short, plain-language message for an error. */

@@ -14,6 +14,7 @@ import {
   fileNameOf,
   isRetryable,
   oneAtATimeNote,
+  savedMessage,
   slowCallMessage,
   titleFor,
   vaultOptions,
@@ -49,6 +50,7 @@ const clearButton = $<HTMLButtonElement>("clear-file");
 const titleInput = $<HTMLInputElement>("title");
 const vaultSelect = $<HTMLSelectElement>("vault");
 const saveButton = $<HTMLButtonElement>("save");
+const trashCheckbox = $<HTMLInputElement>("trash-after-save");
 const statusEl = $<HTMLDivElement>("status");
 const statusActions = $<HTMLDivElement>("status-actions");
 
@@ -248,15 +250,15 @@ async function save(allowDuplicate = false): Promise<void> {
     api.save({ filePath: filePath!, vaultId: vaultSelect.value, title: titleInput.value, allowDuplicate }),
   );
   if (result.ok) {
-    const saved = `Saved “${result.value.title}” to ${vaultName}.`;
+    const saved = savedMessage(result.value.title, vaultName, result.value.original);
     const next = incoming.take();
     if (next) {
       loadFile(next);
-      setStatus(`${saved} Next: “${fileNameOf(next.path)}”.`, "ok");
+      setStatus(`${saved.text} Next: “${fileNameOf(next.path)}”.`, saved.tone);
       return;
     }
     setFile(null);
-    setStatus(saved, "ok");
+    setStatus(saved.text, saved.tone);
     drop.focus();
     return;
   }
@@ -295,6 +297,16 @@ vaultSelect.addEventListener("change", () => {
 });
 titleInput.addEventListener("input", clearStalePrompt);
 
+trashCheckbox.addEventListener("change", async () => {
+  const wanted = trashCheckbox.checked;
+  const result = await api.setTrashAfterSave(wanted);
+  if (!result.ok) {
+    // Show what's actually in effect, never what was merely clicked.
+    trashCheckbox.checked = !wanted;
+    setStatus(`Couldn't change the Trash option: ${result.error.message}`, "error");
+  }
+});
+
 /**
  * Remove leftover action buttons (Save Anyway, Try Again). They were offered
  * for one specific file, title and vault at one moment; once any of those
@@ -331,6 +343,7 @@ function showSaveView(lastVaultId: string | null): void {
 }
 
 const state = await api.getState();
+trashCheckbox.checked = state.trashAfterSave;
 if (state.accountName) {
   accountInput.value = state.accountName;
   showSaveView(state.lastVaultId);

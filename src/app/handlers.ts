@@ -3,9 +3,10 @@
  * Electron imports so it can be tested with a fake 1Password client.
  */
 
+import { stat } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { PaperRouteError, Session, listVaults, saveDocument, type Connect } from "../core/index.js";
-import type { ApiError, AppState, Result, SaveArgs, SaveResult, VaultSummary } from "../shared/api.js";
+import type { ApiError, AppState, OriginalFile, Result, SaveArgs, SaveOutcome, VaultSummary } from "../shared/api.js";
 import type { SettingsStore } from "./settings.js";
 
 export interface HandlerOptions {
@@ -14,13 +15,26 @@ export interface HandlerOptions {
   integrationVersion: string;
   /** Replaces the SDK connection; tests inject a fake here. */
   connect?: Connect;
+  /** Moves a file to the Trash (Electron's shell.trashItem in the app). */
+  trash: (path: string) => Promise<void>;
 }
 
 export interface Handlers {
   getState(): Promise<AppState>;
   setAccount(accountName: unknown): Promise<Result<AppState>>;
+  setTrashAfterSave(on: unknown): Promise<Result<AppState>>;
   listVaults(): Promise<Result<VaultSummary[]>>;
-  save(args: unknown): Promise<Result<SaveResult>>;
+  save(args: unknown): Promise<Result<SaveOutcome>>;
+}
+
+/** Enough of a file's identity to tell whether it changed: size and modification time. */
+async function fingerprint(path: string): Promise<string | null> {
+  try {
+    const info = await stat(path);
+    return `${info.size}:${info.mtimeMs}`;
+  } catch {
+    return null;
+  }
 }
 
 function toApiError(err: unknown): ApiError {
@@ -79,6 +93,11 @@ export function createHandlers(options: HandlerOptions): Handlers {
       return attempt(() => settings.update({ accountName: accountName.trim() }));
     },
 
+    async setTrashAfterSave(on) {
+      if (typeof on !== "boolean") return invalid("The Trash option must be on or off");
+      return attempt(() => settings.update({ trashAfterSave: on }));
+    },
+
     async listVaults() {
       return attempt(async () => listVaults(await requireSession()));
     },
@@ -91,6 +110,11 @@ export function createHandlers(options: HandlerOptions): Handlers {
       if (title !== undefined && typeof title !== "string") return invalid("Title must be text");
 
       return attempt(async () => {
+        const { trashAfterSave } = await settings.get();
+        // Taken before the save, to check afterwards that the file on disk is
+        // still the one that was saved before moving it to the Trash.
+        const before = trashAfterSave ? await fingerprint(filePath) : null;
+
         const result = await saveDocument(await requireSession(), {
           filePath,
           vaultId,
@@ -104,7 +128,28 @@ export function createHandlers(options: HandlerOptions): Handlers {
         await settings.update({ lastVaultId: vaultId }).catch((err: unknown) => {
           console.warn(`[paper-route] saved, but couldn't remember the vault: ${String(err)}`);
         });
-        return result;
+
+        // saveDocument only returns once the bytes have been read back from
+        // 1Password and matched, so the document is safely stored here.
+        let original: OriginalFile = "kept";
+        if (trashAfterSave) {
+          const after = await fingerprint(filePath);
+          if (before === null || after !== before || !after.startsWith(`${result.bytes}:`)) {
+            // It changed while it was being saved: what's in 1Password isn't
+            // the current file, so the current file must not be thrown away.
+            original = "changed";
+          } else {
+            try {
+              await options.trash(filePath);
+              original = "trashed";
+            } catch (err) {
+              // Like the settings write: never report a stored document as a failure.
+              console.warn(`[paper-route] saved, but couldn't move the original to the Trash: ${String(err)}`);
+              original = "failed";
+            }
+          }
+        }
+        return { ...result, original };
       });
     },
   };

@@ -24,6 +24,22 @@ export interface AppState {
   accountName: string | null;
   /** The vault used last time, so it can be preselected. */
   lastVaultId: string | null;
+  /** Move the original file to the Trash once it's safely in 1Password. Off by default. */
+  trashAfterSave: boolean;
+}
+
+/**
+ * What happened to the original file after a successful save:
+ * - "kept": the Trash option is off.
+ * - "trashed": moved to the Trash (recoverable from there).
+ * - "changed": left in place because it changed on disk after it was read,
+ *   so what's in 1Password isn't the current file.
+ * - "failed": moving it to the Trash didn't work; it's still in place.
+ */
+export type OriginalFile = "kept" | "trashed" | "changed" | "failed";
+
+export interface SaveOutcome extends SaveResult {
+  original: OriginalFile;
 }
 
 export interface SaveArgs {
@@ -46,7 +62,8 @@ export interface PaperRouteApi {
   getState(): Promise<AppState>;
   setAccount(accountName: string): Promise<Result<AppState>>;
   listVaults(): Promise<Result<VaultSummary[]>>;
-  save(args: SaveArgs): Promise<Result<SaveResult>>;
+  save(args: SaveArgs): Promise<Result<SaveOutcome>>;
+  setTrashAfterSave(on: boolean): Promise<Result<AppState>>;
   /** Opens the native file picker; resolves to a path, or null if cancelled. */
   chooseFile(): Promise<string | null>;
   /** The filesystem path of a file dropped onto the window. */
@@ -74,4 +91,5 @@ export const CHANNELS = {
   shown: "paper-route:shown",
   takeIncomingFile: "paper-route:take-incoming-file",
   incomingFile: "paper-route:incoming-file",
+  setTrashAfterSave: "paper-route:set-trash-after-save",
 } as const;

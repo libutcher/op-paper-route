@@ -6,7 +6,7 @@
  * no Node access; it reaches this process only through the IPC handlers below.
  */
 
-import { BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, session } from "electron";
+import { BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, session, shell } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -80,6 +80,8 @@ async function start(): Promise<void> {
     settings: new SettingsStore(join(app.getPath("userData"), "settings.json")),
     integrationName: "PaperRoute",
     integrationVersion: version,
+    // The Trash, not deletion: the user can always get the file back.
+    trash: (path) => shell.trashItem(path),
   });
 
   // Only our own page may call these. Arguments are validated in handlers.
@@ -92,6 +94,7 @@ async function start(): Promise<void> {
 
   handle(CHANNELS.getState, () => handlers.getState());
   handle(CHANNELS.setAccount, (name: unknown) => handlers.setAccount(name));
+  handle(CHANNELS.setTrashAfterSave, (on: unknown) => handlers.setTrashAfterSave(on));
   handle(CHANNELS.listVaults, () => handlers.listVaults());
   handle(CHANNELS.save, (args: unknown) => handlers.save(args));
   handle(CHANNELS.chooseFile, async () => {
@@ -122,7 +125,7 @@ async function start(): Promise<void> {
 function createWindow(): void {
   win = new BrowserWindow({
     width: 440,
-    height: 420,
+    height: 450,
     show: false,
     resizable: false,
     minimizable: false,

@@ -8,6 +8,7 @@ import {
   fileNameOf,
   isRetryable,
   oneAtATimeNote,
+  savedMessage,
   slowCallMessage,
   titleFor,
   vaultOptions,
@@ -180,6 +181,15 @@ describe("oneAtATimeNote", () => {
     expect(oneAtATimeNote("a.pdf", 0)).toBeNull();
     expect(oneAtATimeNote("a.pdf", 1)).toBe("Saving one file at a time: using “a.pdf”, not 1 other file.");
     expect(oneAtATimeNote("a.pdf", 3)).toBe("Saving one file at a time: using “a.pdf”, not 3 other files.");
+  });
+});
+
+describe("savedMessage", () => {
+  it("says what happened to the original, and flags anything that needs a look", () => {
+    expect(savedMessage("a.pdf", "Docs", "kept")).toEqual({ text: "Saved “a.pdf” to Docs.", tone: "ok" });
+    expect(savedMessage("a.pdf", "Docs", "trashed")).toEqual({ text: "Saved “a.pdf” to Docs. The original is in the Trash.", tone: "ok" });
+    expect(savedMessage("a.pdf", "Docs", "changed")).toMatchObject({ tone: "waiting", text: expect.stringContaining("left in place") });
+    expect(savedMessage("a.pdf", "Docs", "failed")).toMatchObject({ tone: "waiting", text: expect.stringContaining("still in place") });
   });
 });
 

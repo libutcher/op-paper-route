@@ -130,6 +130,18 @@ button:focus-visible,
   color: var(--muted);
 }
 
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: normal;
+}
+
+label.check input {
+  width: auto;
+  margin: 0;
+}
+
 .actions {
   display: flex;
   align-items: center;

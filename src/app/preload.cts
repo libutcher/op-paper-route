@@ -22,6 +22,7 @@ const CH = {
   shown: "paper-route:shown",
   takeIncomingFile: "paper-route:take-incoming-file",
   incomingFile: "paper-route:incoming-file",
+  setTrashAfterSave: "paper-route:set-trash-after-save",
 };
 
 const api: PaperRouteApi = {
@@ -29,6 +30,7 @@ const api: PaperRouteApi = {
   setAccount: (accountName) => ipcRenderer.invoke(CH.setAccount, accountName),
   listVaults: () => ipcRenderer.invoke(CH.listVaults),
   save: (args) => ipcRenderer.invoke(CH.save, args),
+  setTrashAfterSave: (on) => ipcRenderer.invoke(CH.setTrashAfterSave, on),
   chooseFile: () => ipcRenderer.invoke(CH.chooseFile),
   pathForFile: (file) => webUtils.getPathForFile(file),
   hide: () => ipcRenderer.invoke(CH.hide),
