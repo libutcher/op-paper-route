@@ -68,7 +68,7 @@ const MESSAGES: Record<Exclude<ErrorCode, "UNKNOWN">, string> = {
  * strings; anything it misses falls through to UNKNOWN rather than being
  * mislabelled.
  */
-const MESSAGE_PATTERNS: ReadonlyArray<readonly [RegExp, ErrorCode]> = [
+const MESSAGE_PATTERNS: ReadonlyArray<readonly [RegExp, Exclude<ErrorCode, "UNKNOWN">]> = [
   [/desktop application not found|Native library is not available/i, "APP_NOT_FOUND"],
   [/Account not found/i, "ACCOUNT_NOT_FOUND"],
   [/\b(denied|rejected|not authori[sz]ed|unauthori[sz]ed|locked)\b/i, "NOT_AUTHORIZED"],
@@ -87,7 +87,7 @@ export function fromSdkError(err: unknown): PaperRouteError {
 
   const message = err instanceof Error ? err.message : String(err);
   for (const [pattern, code] of MESSAGE_PATTERNS) {
-    if (code !== "UNKNOWN" && pattern.test(message)) {
+    if (pattern.test(message)) {
       return new PaperRouteError(code, MESSAGES[code], { cause: err });
     }
   }
