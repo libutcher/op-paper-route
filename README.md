@@ -1,12 +1,10 @@
 # PaperRoute
 
-<p align="center">
+A small macOS utility for uploading a document to a 1Password vault with as little friction as possible. Built on the official [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js), with Touch ID authentication from the 1Password desktop app.
+
+<p align="left">
   <img src="docs/demo-dark.gif" width="350" alt="PaperRoute connecting to 1Password, receiving a file from Finder, and saving it to a vault, in dark mode">
 </p>
-
-A small macOS utility for getting a document you just downloaded into a 1Password vault with as little friction as possible: one Touch ID, drop the file, done.
-
-Built on the official [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js) with desktop-app authentication, so there are no tokens or service accounts: the 1Password app itself approves each session, and PaperRoute can reach every vault you can, including your Private vault.
 
 ## What's included
 
@@ -20,7 +18,7 @@ What PaperRoute never does: it stores no tokens or passwords, uses no service ac
 ## Requirements
 
 - **macOS** on Apple silicon (an Intel build can be made from source).
-- **The 1Password desktop app**, with **Settings → Developer → Integrate with 1Password SDKs** turned on. PaperRoute talks to 1Password only through this.
+- **The 1Password desktop app**, with **Settings → Developer → Integrate with 1Password SDKs** turned on. 
 
 ## Installation
 
@@ -108,39 +106,3 @@ If Electron starts and immediately exits with an error about `app` being undefin
 - `scripts/` — packaging (`package.mjs`, `make-dmg.mjs`), icon rendering, the development Quick Action installer, and the demo recorder (`demo/`).
 - `assets/`, `build/`, `docs/` — icon sources and outputs, the entitlements, and the demo.
 
-### Packaging and signing
-
-`npm run package` signs the app **ad hoc** with the hardened runtime, using `build/entitlements.plist`:
-
-- `allow-jit` for Electron's JavaScript engine;
-- `disable-library-validation`, so the hardened app can load 1Password's SDK library, which is signed by 1Password's team rather than ours.
-
-It also flips Electron's **fuses** before signing, so the shipped app can't be made to run other code: `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect` are ignored, and the app runs only its own `app.asar`, whose hash is checked at launch.
-
-**Test the packaged app the way users launch it:** from Finder, or with `open`. Started from a terminal inside VS Code, macOS treats VS Code as responsible for it, so 1Password's approval prompt names VS Code instead of PaperRoute.
-
-Signing with a Developer ID and notarising needs an Apple Developer membership. When that's in place, only the signing identity in `scripts/package.mjs` changes, plus a notarisation step; the entitlements and fuses stay as they are.
-
-### Things worth knowing about the SDK
-
-Found while building this; none of it is in the SDK documentation.
-
-- **The real file limit is about 14 MB, not 50 MB.** The SDK caps each message at 50 MB, but it serializes file bytes as a JSON array of decimal numbers, so each byte of file costs 2–4 bytes of message. `src/core/limits.ts` computes the exact encoded size before asking for approval.
-- **Approval is per process, and belongs to 1Password.** 1Password approves a specific process for a specific account, for ten minutes of inactivity or until it locks, and revokes it itself; the app holds only a handle, never credentials. The approval is cached for the process: creating a second SDK client in the same process connects in about 0.3 s with no prompt (measured), so an app cannot make 1Password re-prompt by discarding its client. The only levers are 1Password's own: its idle timeout, locking, or restarting the app. Within an approval, the handle can reach any vault the user can (desktop auth can't be narrowed to one vault), which is why the packaged app's fuses, hardened runtime and sandboxed window matter.
-- **Locking 1Password doesn't raise the SDK's session-expired error.** The next call waits while 1Password prompts again (minutes, if nobody answers), then fails with a plain `invalid client id`. A denied prompt, and a locked app whose unlock is cancelled, both give `Denied authorization for SDK client`. `src/core/errors.ts` maps these exact messages; the UI shows that it's waiting for 1Password.
-- **The SDK accepts only the exact account name or the account ID**, case-sensitive, not an email. There's no call that lists accounts.
-- **Vault titles are not unique.** Always select and remember vaults by id.
-- **Empty files read back as a plain `[]`**, not a `Uint8Array`; the SDK's JSON reviver only converts non-empty byte arrays.
-- Desktop auth works by `dlopen`-ing `libop_sdk_ipc_client.dylib` from inside the 1Password app bundle, so the SDK needs a real Node process; it cannot run in a browser or a plain WebView.
-
-### Project history
-
-| Milestone | State |
-|---|---|
-| M0 Prove an upload works end to end | Done |
-| M1 Core library with tests, and a CLI | Done |
-| M2 Desktop app: menu bar, hotkey, drop zone, vault picker | Done |
-| M3 Getting files in: Finder Quick Action, drop on the menu-bar icon, optional move to Trash | Done |
-| Design pass: logo, menu-bar icon, animated status line, friendlier first run | Done |
-| M4a Packaged app: disk image, app icon, hardened runtime, locked-down Electron | Done |
-| M4b Developer ID signing and notarisation | Needs an Apple Developer membership |
