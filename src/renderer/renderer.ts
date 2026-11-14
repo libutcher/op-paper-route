@@ -255,7 +255,11 @@ async function save(allowDuplicate = false): Promise<void> {
   // (INVALID_REQUEST), a bad file or a failed verification need something to
   // change first.
   const retryable = RETRYABLE.has(error.code);
-  setStatus(describeError(error), "error", retryable ? [{ label: "Try Again", run: () => void save(allowDuplicate) }] : []);
+  // Try Again never carries "Save Anyway" over. A failed attempt may still
+  // have stored the document (an expiry can be reported after the item
+  // landed), so the retry runs the duplicate check again and, if a copy is
+  // there, asks again rather than silently adding another.
+  setStatus(describeError(error), "error", retryable ? [{ label: "Try Again", run: () => void save() }] : []);
 }
 
 saveView.addEventListener("submit", (event) => {
