@@ -37,7 +37,7 @@ To build the disk image yourself, see [Development](#development).
 When you first open PaperRoute, connect the 1Password account where you want to save documents:
 
 1. Open the 1Password desktop app and find your account name at the top of the left sidebar.
-2. Enter that name in PaperRoute and press **Continue**. PaperRoute checks that the name matches an account in 1Password.
+2. Enter that name in PaperRoute and select **Continue**. PaperRoute checks that the name matches an account in 1Password.
 3. Approve the request in 1Password.
 
 Account names are matched without regard to capitalization or apostrophe style, but otherwise must match exactly. PaperRoute can't list your accounts for you.
