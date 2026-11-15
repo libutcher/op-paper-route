@@ -16,7 +16,7 @@ This is an independent project and is not affiliated with, endorsed by, or suppo
 - **A Finder Quick Action.** Right-click a file > **Quick Actions** > **Save to 1Password with PaperRoute**, and the utility opens with the file loaded. 
 - **Optional clean-up.** A checkbox moves the original to the Trash once the document is safely in 1Password.
 
-PaperRoute never reads information stored in 1Password. Every session is approved by you, in the 1Password app, the same way you unlock it.
+PaperRoute never reads information stored in 1Password vaults. Every session is approved by you, in the 1Password app, the same way you unlock it.
 
 ## Requirements
 
