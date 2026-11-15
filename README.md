@@ -51,7 +51,7 @@ To switch to a different account, select **Choose Account…** from the paper-pl
 
 ## Step 3: Save a document
 
-PaperRoute can currently save one document at a time. Support for multiple document upload is coming in a future update.
+PaperRoute can currently save one document at a time. Support for multiple document upload is coming in a future update. Files are limited to 14MB.
 
 If a document with the same title is already in the vault, PaperRoute asks before saving another. Saved documents are tagged `paper-route`.
 
@@ -74,9 +74,9 @@ After you turn on the Finder Quick Action from the PaperRoute menu-bar icon:
 
 ## Troubleshooting
 
-- **If the Quick Action isn't in the right-click menu.** New Quick Actions can start switched off. Turn it on in **System Settings → General → Login Items & Extensions → Extensions → Finder** (click the ⓘ). It's also available under **Services** at the bottom of the right-click menu.
-- ** If you see "Waiting for 1Password"** means 1Password is showing you an approval prompt, or is locked. Unlock it or approve the request, and PaperRoute carries on.
-- ** If you see "PaperRoute can't find the 1Password account … any more."** The account was renamed or signed out of 1Password. Check its name at the top of the 1Password sidebar and enter it again.
+- **If you don't see the Quick Action in the right-click menu.** New Quick Actions can start switched off. Turn it on in **System Settings** > **General** > **Login Items & Extensions** > **Extensions** > **Finder**.
+- **If you see "Waiting for 1Password".** 1Password is showing you an approval prompt, or is locked. Unlock it or approve the request, and PaperRoute continues.
+- **If you see "PaperRoute can't find the 1Password account … any more."** The account was renamed or signed out of 1Password. Check its name at the top of the 1Password sidebar and enter it again.
 
 PaperRoute stores your account name, last-used vault ID, and Trash preference in `~/Library/Application Support/paper-route/settings.json`. No passwords, authentication tokens, or document contents are stored in this file.
 
