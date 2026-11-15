@@ -1,6 +1,6 @@
 # PaperRoute
 
-Save a document from Finder to a 1Password vault without manually creating an item in 1Password. PaperRoute is a small macOS menu-bar utility built on the [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js), using Touch ID authentication through the 1Password desktop app.
+A small macOS utility that lets you update a document to a 1Password vault with as little friction as possible. Built on the [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js), with Touch ID authentication from the 1Password desktop app.
 
 <p align="left">
   <img src="docs/demo-dark.gif" width="350" alt="PaperRoute connecting to 1Password, receiving a file from Finder, and saving it to a vault, in dark mode">
