@@ -4,7 +4,7 @@
  * lives here; vault ids and an account name are not credentials.
  */
 
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export interface Settings {
@@ -40,7 +40,10 @@ export class SettingsStore {
 
   async #write(patch: Partial<Settings>): Promise<Settings> {
     const next = { ...(await this.get()), ...patch };
-    await mkdir(dirname(this.#file), { recursive: true });
+    const directory = dirname(this.#file);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    // mkdir does not change the mode of an existing directory.
+    await chmod(directory, 0o700);
     // Write-then-rename so a crash mid-write can't leave a truncated file.
     // Each write gets its own temp name so no two writes share one.
     const tmp = `${this.#file}.${process.pid}.${++this.#writes}.tmp`;
