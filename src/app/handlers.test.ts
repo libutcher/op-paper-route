@@ -283,11 +283,26 @@ describe("handlers", () => {
     expect(connect).not.toHaveBeenCalled();
   });
 
+  it("tightens permissions on an existing settings directory", async () => {
+    const fs = await import("node:fs/promises");
+    const directory = join(dir, "settings");
+    await fs.mkdir(directory, { mode: 0o755 });
+    await fs.chmod(directory, 0o755);
+
+    await new SettingsStore(settingsFile).update({ accountName: "Example Family" });
+
+    const { mode } = await fs.stat(directory);
+    expect(mode & 0o777).toBe(0o700);
+  });
+
   it("writes the settings file privately", async () => {
     const { handlers } = setup();
     await handlers.setAccount("Example Family");
-    const { mode } = await import("node:fs/promises").then((fs) => fs.stat(settingsFile));
+    const fs = await import("node:fs/promises");
+    const { mode } = await fs.stat(settingsFile);
     expect(mode & 0o777).toBe(0o600);
+    const { mode: directoryMode } = await fs.stat(join(dir, "settings"));
+    expect(directoryMode & 0o777).toBe(0o700);
     expect(JSON.parse(await readFile(settingsFile, "utf8"))).toEqual({
       accountName: "Example Family",
       lastVaultId: null,
