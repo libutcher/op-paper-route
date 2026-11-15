@@ -50,7 +50,7 @@ To switch to a different account, or to leave nothing behind on a shared Mac, ch
 
 1. Give PaperRoute a document: right-click it in Finder and choose **Quick Actions → Save to 1Password with PaperRoute**, drop it on the window or the menu-bar icon, or press **Control-Option-P** and choose a file.
 2. The title, which becomes the item's name in 1Password, fills in from the file name without its extension, selected so you can retype it. The vault you used last time is already chosen.
-3. Press **Return** to save. Wait for the confirmation **Saved “<title>” to <vault>.** in the window. **Esc** hides the window.
+3. Press **Return** to save. PaperRoute confirms success with a **Saved** message showing the document title and vault. **Esc** hides the window.
 
 If a document with the same title is already in the vault, PaperRoute asks before saving another. If you hand it a file while a save is in progress, that file waits and loads when the save finishes. With several files selected, the first is used and PaperRoute says how many were left out. Saved documents are tagged `paper-route`.
 
