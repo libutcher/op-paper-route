@@ -1,10 +1,12 @@
 # PaperRoute
 
-An unofficial macOS utility that lets you save a document to 1Password with as little friction as possible. Built on the [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js), with Touch ID authentication from the 1Password desktop app.
+An open-source macOS utility that lets you save a document to 1Password with as little friction as possible. Built on the [1Password JavaScript SDK](https://github.com/1Password/onepassword-sdk-js), with Touch ID authentication from the 1Password desktop app.
 
 <p align="left">
   <img src="docs/demo-dark.gif" width="350" alt="PaperRoute connecting to 1Password, receiving a file from Finder, and saving it to a vault, in dark mode">
 </p>
+
+This is an independent project and is not affiliated with, endorsed by, or supported by 1Password.
 
 > **Version 0.1**. PaperRoute works end to end, but development is in progress. Issues and feedback are welcome.
 
