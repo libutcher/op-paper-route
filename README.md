@@ -44,7 +44,7 @@ Account names are matched without regard to capitalization or apostrophe style, 
 
 1Password controls approval. It lasts while PaperRoute is running, until 1Password locks or ten minutes pass without use. When approval expires, PaperRoute asks again the next time it needs access.
 
-To switch to a different account, or to leave nothing behind on a shared Mac, choose **Choose Account…** from the menu-bar icon. PaperRoute forgets the current account and restarts onto the first-run screen, which is also what ends 1Password's approval (it belongs to the running process, and nothing inside the app can revoke it). Nothing in 1Password is changed.
+To switch to a different account, select **Choose Account…** from the menu-bar icon. PaperRoute forgets the current account and prompts you to enter a new account name. 
 
 ### Saving a document
 
