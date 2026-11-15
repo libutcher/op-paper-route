@@ -49,6 +49,8 @@ PaperRoute can currently save one document at a time. Support for multiple docum
 
 If a document with the same title is already in the vault, PaperRoute asks before saving another. Saved documents are tagged `paper-route`.
 
+If you choose to move the file to trash, the file is moved only after the document has been read back from 1Password and matched byte for byte, and only if it hasn't changed since it was read. It goes to the Trash, not deleted, so it can be recovered. PaperRoute remembers this setting.
+
 ### From the app
 
 1. Drop the document you want to upload into the app, or choose a file to save in 1Passowrd.
@@ -64,11 +66,7 @@ After you turn on Quick Access from the PaperRoute menu-bar icon:
 2. Right-click the file and select **Quick Actions** > **Save to 1Password with PaperRoute**.
 3. The app will open with the file ready to upload. Enter a name for the 1Password item, choose a vault, and select **Save to 1Password**.
 
-### Moving the original to the Trash
-
-The file is moved only after the document has been read back from 1Password and matched byte for byte, and only if it hasn't changed since it was read. It goes to the Trash, not deleted, so it can be recovered. The setting is remembered.
-
-### If something doesn't work
+## Troubleshooting
 
 - **The Quick Action isn't in the right-click menu.** New Quick Actions can start switched off. Turn it on in **System Settings → General → Login Items & Extensions → Extensions → Finder** (click the ⓘ). It's also available under **Services** at the bottom of the right-click menu.
 - **"Waiting for 1Password"** means 1Password is showing you an approval prompt, or is locked. Unlock it or approve the request, and PaperRoute carries on.
