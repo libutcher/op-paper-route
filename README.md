@@ -23,9 +23,13 @@ PaperRoute never reads information stored in 1Password. Every session is approve
 
 ## Step 1: Install PaperRoute
 
-1. Download `PaperRoute-<version>-arm64.dmg` from the [latest release](https://github.com/libutcher/op-paper-route/releases/latest), open it, and drag **PaperRoute** to **Applications**. Each release also lists the file's SHA-256 checksum; to check your download, run `shasum -a 256` on it and compare.
-2. Open it from Applications. PaperRoute isn't signed with an Apple Developer ID yet, so macOS may refuse the first time. If this happens, go to **System Settings → Privacy & Security**, find the message about PaperRoute, and choose **Open Anyway**. You only have to do this once.
-3. (Optional) To save files from Finder's right-click menu, click the paper-plane icon in the top menu bar and choose **Install Finder Quick Action…**. The same menu item removes it again. 
+1. Download `PaperRoute-<version>-arm64.dmg` from the [latest release](https://github.com/libutcher/op-paper-route/releases/latest).
+2. Open the file, then drag **PaperRoute** to **Applications**. 
+3. (Optional) To save files from Finder, click the paper-plane icon in the top menu bar and choose **Install Finder Quick Action…**. The same menu item removes it again. 
+
+Each release lists the file's SHA-256 checksum. To check your download, run `shasum -a 256` on it and compare.
+
+PaperRoute isn't signed with an Apple Developer ID yet, so macOS may refuse the first time. If this happens, go to **System Settings → Privacy & Security**, find the message about PaperRoute, and choose **Open Anyway**. You only have to do this once.
 
 To build the disk image yourself, see [Development](#development).
 
@@ -43,7 +47,7 @@ Account names are matched without regard to capitalization or apostrophe style, 
 
 To switch to a different account, select **Choose Account…** from the paper-plane menu-bar icon. PaperRoute forgets the current account and prompts you to enter a new account name. 
 
-### Save a document
+## Step 3: Save a document
 
 PaperRoute can currently save one document at a time. Support for multiple document upload is coming in a future update.
 
@@ -60,7 +64,7 @@ If you choose to move the file to trash, the file is moved only after the docume
 
 ### From Finder
 
-After you turn on Quick Access from the PaperRoute menu-bar icon:
+After you turn on the Finder Quick Action from the PaperRoute menu-bar icon:
 
 1. Open Finder and navigate to the file you want to save in 1Password. 
 2. Right-click the file and select **Quick Actions** > **Save to 1Password with PaperRoute**.
