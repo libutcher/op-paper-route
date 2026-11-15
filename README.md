@@ -79,7 +79,7 @@ After you turn on the Finder Quick Action from the PaperRoute menu-bar icon:
 - **"PaperRoute can't find the 1Password account … any more."** The account was renamed or signed out of 1Password. Check its name at the top of the 1Password sidebar and enter it again.
 - **Large files.** The 1Password SDK can't accept files over about 14 MB. PaperRoute says so before asking for approval.
 
-Settings (the account name, the last vault and the Trash option) are kept in `~/Library/Application Support/paper-route/settings.json`. Nothing secret is stored there.
+PaperRoute stores your account name, last-used vault ID, and Trash preference in `~/Library/Application Support/paper-route/settings.json`. No passwords, authentication tokens, or document contents are stored in this file.
 
 ## Development
 
