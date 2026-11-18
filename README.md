@@ -59,9 +59,9 @@ If you choose to move the file to trash, the file is moved only after the docume
 
 ### From the app
 
-1. Drop the document you want to upload into the app, or choose a file to save in 1Passowrd.
+1. Drop the document you want to upload into the app, or choose a file to save in 1Password.
 2. Choose a title for the new item in 1Password, like `Dentist Receipt, March 2026`. PaperRoute uses the file name if left blank.
-3. (Optional) Select the checbox to "Move the original to the Trash after saving" if you want to delete the original file. 
+3. (Optional) Select the checkbox to "Move the original to the Trash after saving" if you want to delete the original file. 
 4. Select **Save to 1Password**. A new item with the file will be added to the vault. 
 
 ### From Finder
